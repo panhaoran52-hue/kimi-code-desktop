@@ -34,16 +34,13 @@ src-tauri/sidecar/        Tauri externalBin 输出位置
 ## 验证
 
 ```bat
-npm run build
-cargo check --manifest-path src-tauri\Cargo.toml
-cd sidecar-adapter
-python -m compileall -q kimi_desktop_sidecar
+npm run check
 ```
 
 ## 打包
 
 ```bat
-npm run tauri:build
+npm run release:msi
 ```
 
 打包前需要确保存在：

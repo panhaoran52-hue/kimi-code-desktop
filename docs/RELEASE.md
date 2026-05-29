@@ -30,6 +30,7 @@ The preflight checks:
 
 - frontend production build
 - Rust compile check
+- Rust clippy lint gate
 - Python sidecar compile check
 - Python sidecar tests
 - npm audit for high or critical advisories
