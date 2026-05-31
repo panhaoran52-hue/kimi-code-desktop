@@ -1,13 +1,11 @@
-use crate::sidecar::{call_desktop_api, WireProcessManager};
+use crate::runtime_check;
+use crate::sidecar::{call_desktop_api, clear_desktop_api_cache, WireProcessManager};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::process::Command;
 
-const KIMI_CLI_VERSION_TIMEOUT: Duration = Duration::from_secs(5);
 const DEFAULT_MCP_JSON: &str = "{\n  \"mcpServers\": {}\n}\n";
 
 #[derive(Deserialize)]
@@ -39,7 +37,9 @@ fn kimi_metadata_path() -> Result<PathBuf, String> {
 
 fn is_hidden_work_dir(path: &str) -> bool {
     let normalized = path.replace('\\', "/");
-    normalized == "/tmp" || normalized.starts_with("/var/folders") || normalized.contains("/.cache/")
+    normalized == "/tmp"
+        || normalized.starts_with("/var/folders")
+        || normalized.contains("/.cache/")
 }
 
 fn list_work_dirs_fast() -> Result<Value, String> {
@@ -47,10 +47,10 @@ fn list_work_dirs_fast() -> Result<Value, String> {
     if !path.exists() {
         return Ok(json!([]));
     }
-    let content =
-        fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
-    let metadata: KimiMetadata =
-        serde_json::from_str(&content).map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+    let metadata: KimiMetadata = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
     let work_dirs: Vec<String> = metadata
         .work_dirs
         .into_iter()
@@ -88,8 +88,7 @@ fn write_kimi_config_file(file_name: &str, content: &str) -> Result<Value, Strin
             .map_err(|e| format!("Failed to create {}: {}", parent.display(), e))?;
     }
 
-    fs::write(&path, content)
-        .map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
+    fs::write(&path, content).map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
 
     Ok(json!({
         "success": true,
@@ -175,7 +174,8 @@ pub async fn get_session(
     state: tauri::State<'_, WireProcessManager>,
     session_id: String,
 ) -> Result<Value, String> {
-    let mut result = call_desktop_api(&app, "get_session", json!({"session_id": session_id})).await?;
+    let mut result =
+        call_desktop_api(&app, "get_session", json!({"session_id": session_id})).await?;
     attach_runtime_status_to_session(&mut result, &state);
     Ok(result)
 }
@@ -185,7 +185,12 @@ pub async fn replay_session_history(
     app: tauri::AppHandle,
     session_id: String,
 ) -> Result<Value, String> {
-    call_desktop_api(&app, "replay_session_history", json!({"session_id": session_id})).await
+    call_desktop_api(
+        &app,
+        "replay_session_history",
+        json!({"session_id": session_id}),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -296,7 +301,12 @@ pub async fn get_session_file(
     session_id: String,
     path: String,
 ) -> Result<Value, String> {
-    call_desktop_api(&app, "get_session_file", json!({"session_id": session_id, "path": path})).await
+    call_desktop_api(
+        &app,
+        "get_session_file",
+        json!({"session_id": session_id, "path": path}),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -344,7 +354,9 @@ pub fn get_config_toml() -> Result<Value, String> {
 #[tauri::command]
 pub fn update_config_toml(content: String) -> Result<Value, String> {
     validate_toml(&content)?;
-    write_kimi_config_file("config.toml", &content)
+    let response = write_kimi_config_file("config.toml", &content)?;
+    clear_desktop_api_cache();
+    Ok(response)
 }
 
 #[tauri::command]
@@ -402,7 +414,12 @@ pub async fn get_git_diff_stats(
     app: tauri::AppHandle,
     session_id: String,
 ) -> Result<Value, String> {
-    call_desktop_api(&app, "get_git_diff_stats", json!({"session_id": session_id})).await
+    call_desktop_api(
+        &app,
+        "get_git_diff_stats",
+        json!({"session_id": session_id}),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -424,16 +441,21 @@ pub fn get_app_version(app: tauri::AppHandle) -> String {
 }
 
 #[tauri::command]
-pub async fn get_kimi_cli_version() -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(resolve_kimi_cli_version)
-        .await
-        .map_err(|e| format!("Failed to join version probe: {}", e))?
+pub async fn get_kimi_cli_version(app: tauri::AppHandle) -> Result<String, String> {
+    runtime_check::resolve_runtime_kimi_cli_version(&app).await
+}
+
+#[tauri::command]
+pub async fn check_runtime_readiness(
+    app: tauri::AppHandle,
+) -> Result<runtime_check::RuntimeReadiness, String> {
+    Ok(runtime_check::check_runtime_readiness(&app).await)
 }
 
 #[tauri::command]
 pub async fn open_kimi_login() -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        let program = resolve_kimi_cli_program()?;
+        let program = runtime_check::resolve_external_kimi_cli_program_blocking()?;
         launch_kimi_login_terminal(&program)?;
         Ok(json!({
             "success": true,
@@ -512,76 +534,20 @@ fn attach_runtime_status_to_session(
     let Some(obj) = value.as_object_mut() else {
         return;
     };
-    let Some(session_id) = obj.get("session_id").and_then(Value::as_str).map(str::to_string) else {
+    let Some(session_id) = obj
+        .get("session_id")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+    else {
         return;
     };
-    obj.insert("is_running".to_string(), Value::Bool(manager.is_running(&session_id)));
+    obj.insert(
+        "is_running".to_string(),
+        Value::Bool(manager.is_running(&session_id)),
+    );
     if let Some(status) = manager.get_status(&session_id) {
         obj.insert("status".to_string(), json!(status));
     }
-}
-
-fn resolve_kimi_cli_version() -> Result<String, String> {
-    if let Ok(version) = std::env::var("KIMI_CLI_VERSION") {
-        let trimmed = version.trim();
-        if !trimmed.is_empty() {
-            return Ok(trimmed.to_string());
-        }
-    }
-
-    let mut errors = Vec::new();
-    for program in kimi_cli_version_candidates() {
-        match run_kimi_version_command(&program) {
-            Ok(output) => {
-                if let Some(version) = parse_version_from_output(&output) {
-                    return Ok(version);
-                }
-                errors.push(format!("{} returned unparseable output: {}", program, output.trim()));
-            }
-            Err(error) => errors.push(format!("{}: {}", program, error)),
-        }
-    }
-
-    Err(format!("Unable to resolve Kimi CLI version ({})", errors.join("; ")))
-}
-
-fn resolve_kimi_cli_program() -> Result<String, String> {
-    let mut errors = Vec::new();
-    for program in kimi_cli_version_candidates() {
-        match run_kimi_version_command(&program) {
-            Ok(_) => return Ok(program),
-            Err(error) => errors.push(format!("{}: {}", program, error)),
-        }
-    }
-
-    Err(format!("Unable to find Kimi CLI ({})", errors.join("; ")))
-}
-
-fn kimi_cli_version_candidates() -> Vec<String> {
-    let mut candidates = Vec::new();
-
-    if let Ok(bin) = std::env::var("KIMI_CLI_BIN") {
-        let trimmed = bin.trim();
-        if !trimmed.is_empty() {
-            candidates.push(trimmed.to_string());
-        }
-    }
-
-    candidates.push("kimi".to_string());
-
-    #[cfg(target_os = "windows")]
-    {
-        if let Ok(user_profile) = std::env::var("USERPROFILE") {
-            let path = std::path::Path::new(&user_profile)
-                .join(".local")
-                .join("bin")
-                .join("kimi.exe");
-            candidates.push(path.to_string_lossy().to_string());
-        }
-    }
-
-    candidates.dedup();
-    candidates
 }
 
 fn launch_kimi_login_terminal(program: &str) -> Result<(), String> {
@@ -611,7 +577,10 @@ fn launch_kimi_login_terminal(program: &str) -> Result<(), String> {
 
     #[cfg(target_os = "linux")]
     {
-        let command = format!("\"{}\" login; echo; read -p 'Press Enter to close...'", program);
+        let command = format!(
+            "\"{}\" login; echo; read -p 'Press Enter to close...'",
+            program
+        );
         let terminals: &[(&str, &[&str])] = &[
             ("x-terminal-emulator", &["-e", "sh", "-lc"]),
             ("gnome-terminal", &["--", "sh", "-lc"]),
@@ -634,54 +603,4 @@ fn launch_kimi_login_terminal(program: &str) -> Result<(), String> {
             errors.join("; ")
         ))
     }
-}
-
-fn run_kimi_version_command(program: &str) -> Result<String, String> {
-    let mut child = Command::new(program)
-        .arg("--version")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| e.to_string())?;
-
-    let started_at = Instant::now();
-    loop {
-        match child.try_wait().map_err(|e| e.to_string())? {
-            Some(_) => {
-                let output = child.wait_with_output().map_err(|e| e.to_string())?;
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                let combined = format!("{}{}", stdout, stderr);
-                if output.status.success() {
-                    return Ok(combined);
-                }
-                return Err(format!(
-                    "exited with status {}: {}",
-                    output.status,
-                    combined.trim()
-                ));
-            }
-            None if started_at.elapsed() >= KIMI_CLI_VERSION_TIMEOUT => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err("timed out while running --version".to_string());
-            }
-            None => thread::sleep(Duration::from_millis(50)),
-        }
-    }
-}
-
-fn parse_version_from_output(output: &str) -> Option<String> {
-    output
-        .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '+'))
-        .find(|token| {
-            token.contains('.')
-                && token
-                    .chars()
-                    .next()
-                    .map(|ch| ch.is_ascii_digit())
-                    .unwrap_or(false)
-        })
-        .map(str::to_string)
 }

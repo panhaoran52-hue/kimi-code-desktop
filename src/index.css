@@ -168,6 +168,10 @@ body {
   overflow: hidden;
 }
 
+[data-slot="resizable-panel"] {
+  overflow: hidden !important;
+}
+
 /* 4. Tailwind @theme inline */
 @theme inline {
   --font-sans:

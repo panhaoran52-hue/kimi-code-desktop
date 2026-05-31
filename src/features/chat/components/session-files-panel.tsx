@@ -141,16 +141,18 @@ export function SessionFilesPanel({
   return (
     <aside
       className={cn(
-        "flex h-full min-h-0 flex-col bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/85",
+        "flex h-full w-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/85",
         className,
       )}
     >
-      <div className="border-b px-3 py-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold">Workspace files</h2>
-              <Badge variant="secondary">{entries.length}</Badge>
+      <div className="w-full min-w-0 max-w-full overflow-hidden border-b px-3 py-3">
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <div className="flex min-w-0 items-center gap-2">
+              <h2 className="min-w-0 truncate text-sm font-semibold">Workspace files</h2>
+              <Badge variant="secondary" className="shrink-0">
+                {entries.length}
+              </Badge>
             </div>
             <p
               className="mt-1 truncate text-xs text-muted-foreground"
@@ -159,7 +161,7 @@ export function SessionFilesPanel({
               {workDir ?? "Current work directory"}
             </p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <Button
               type="button"
               variant="ghost"
@@ -187,7 +189,7 @@ export function SessionFilesPanel({
           </div>
         </div>
 
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 overflow-hidden">
           <Button
             type="button"
             variant="secondary"
@@ -219,8 +221,11 @@ export function SessionFilesPanel({
         </div>
       </div>
 
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="space-y-2 p-3">
+      <ScrollArea
+        className="min-h-0 min-w-0 max-w-full flex-1 overflow-x-hidden"
+        viewportClassName="min-w-0 max-w-full overflow-x-hidden [&>div]:!block [&>div]:!min-w-0 [&>div]:!w-full [&>div]:!max-w-full [&>div]:!overflow-x-hidden"
+      >
+        <div className="w-full min-w-0 max-w-full space-y-2 overflow-x-hidden p-3">
           {isLoading && entries.length === 0 ? (
             <div className="flex min-h-40 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
               <Loader2Icon className="size-5 animate-spin" />
@@ -229,9 +234,9 @@ export function SessionFilesPanel({
           ) : null}
 
           {!isLoading && error ? (
-            <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm">
-              <div className="flex items-start gap-2">
-                <AlertTriangleIcon className="mt-0.5 size-4 text-destructive" />
+            <div className="min-w-0 overflow-hidden rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm">
+              <div className="flex min-w-0 items-start gap-2">
+                <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-foreground">
                     Failed to load this directory
@@ -254,7 +259,7 @@ export function SessionFilesPanel({
           ) : null}
 
           {!(isLoading || error) && entries.length === 0 ? (
-            <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-sm text-muted-foreground">
+            <div className="flex min-h-40 min-w-0 flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border border-dashed text-sm text-muted-foreground">
               <FolderIcon className="size-5" />
               <span>No files in this directory.</span>
             </div>
@@ -269,7 +274,7 @@ export function SessionFilesPanel({
                 return (
                   <div
                     key={`${entry.type}:${itemPath}`}
-                    className="flex items-center gap-2 rounded-xl border bg-card/60 px-2.5 py-2"
+                    className="flex min-w-0 items-center gap-2 overflow-hidden rounded-xl border bg-card/60 px-2.5 py-2"
                   >
                     {isDirectory ? (
                       <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
@@ -294,6 +299,7 @@ export function SessionFilesPanel({
                         type="button"
                         variant="ghost"
                         size="icon-xs"
+                        className="shrink-0"
                         onClick={() => handleOpenDirectory(itemPath)}
                         aria-label={`Open directory ${entry.name}`}
                       >
@@ -304,6 +310,7 @@ export function SessionFilesPanel({
                         type="button"
                         variant="ghost"
                         size="icon-xs"
+                        className="shrink-0"
                         onClick={
                           onGetSessionFile
                             ? async () => {

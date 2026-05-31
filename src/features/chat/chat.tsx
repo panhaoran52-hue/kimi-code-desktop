@@ -25,6 +25,7 @@ import { ApprovalDialog } from "./components/approval-dialog";
 import { QuestionDialog, usePendingQuestion } from "./components/question-dialog";
 import { SessionFilesPanel } from "./components/session-files-panel";
 import { useGitDiffStats } from "@/hooks/useGitDiffStats";
+import { cn } from "@/lib/utils";
 import {
   deriveActivityStatus,
   type ActivityDetail,
@@ -278,7 +279,12 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
   );
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden lg:sticky lg:top-4 lg:min-h-[560px]">
+    <div
+      className={cn(
+        "flex h-full min-h-0 w-full flex-col overflow-hidden",
+        layoutMode === "single" && "lg:sticky lg:top-4 lg:min-h-[560px]",
+      )}
+    >
       <div className="relative flex h-full flex-col">
         <ChatWorkspaceHeader
           currentStep={currentStep}

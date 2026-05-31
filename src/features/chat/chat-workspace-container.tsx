@@ -87,7 +87,7 @@ export function ChatWorkspaceContainer({
   );
   const sessionId = selectedSessionId || null;
 
-  const { config } = useGlobalConfig();
+  const { config } = useGlobalConfig({ enabled: Boolean(currentSession) });
   const maxContextSize = useMemo(() => {
     if (!config) return undefined;
     const model = config.models.find((m) => m.name === config.defaultModel);

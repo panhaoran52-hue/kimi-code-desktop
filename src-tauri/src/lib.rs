@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod notify;
+pub mod runtime_check;
 pub mod sidecar;
 pub mod tray;
 
@@ -40,6 +41,7 @@ pub fn run() {
             commands::hide_window,
             commands::get_app_version,
             commands::get_kimi_cli_version,
+            commands::check_runtime_readiness,
             commands::open_kimi_login,
             commands::open_external,
             commands::open_in_explorer,
@@ -48,12 +50,8 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
             tray::setup_tray(&handle)?;
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.center();
-                let _ = window.set_focus();
-            }
+            // Keep the main window hidden until React has mounted and invokes
+            // show_window. This avoids exposing a blank webview during startup.
             sidecar::prewarm_desktop_api_process(handle.clone());
 
             #[cfg(desktop)]

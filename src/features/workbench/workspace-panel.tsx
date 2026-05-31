@@ -208,18 +208,18 @@ export const WorkspacePanel = memo(function WorkspacePanelComponent({
   return (
     <aside
       className={cn(
-        'flex h-full min-h-0 flex-col bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/85',
+        'flex h-full w-full min-w-0 max-w-full flex-col overflow-hidden bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/85',
         className,
       )}
     >
-      <div className='border-b px-3 py-3'>
-        <div className='flex items-start justify-between gap-3'>
-          <div className='min-w-0'>
-            <div className='flex items-center gap-2'>
-              <SparklesIcon className='size-4 text-primary' />
-              <h2 className='text-sm font-semibold'>Workspace</h2>
+      <div className='w-full min-w-0 max-w-full overflow-hidden border-b px-3 py-3'>
+        <div className='flex min-w-0 items-start justify-between gap-3'>
+          <div className='min-w-0 flex-1'>
+            <div className='flex min-w-0 items-center gap-2'>
+              <SparklesIcon className='size-4 shrink-0 text-primary' />
+              <h2 className='min-w-0 truncate text-sm font-semibold'>Workspace</h2>
               {streamSnapshot.planMode ? (
-                <Badge variant='secondary' className='text-[10px]'>
+                <Badge variant='secondary' className='shrink-0 text-[10px]'>
                   Plan
                 </Badge>
               ) : null}
@@ -236,6 +236,7 @@ export const WorkspacePanel = memo(function WorkspacePanelComponent({
               type='button'
               variant='ghost'
               size='icon-xs'
+              className='shrink-0'
               onClick={onClose}
               aria-label='Collapse workspace panel'
             >
@@ -244,22 +245,22 @@ export const WorkspacePanel = memo(function WorkspacePanelComponent({
           ) : null}
         </div>
 
-        <div className='mt-3 grid grid-cols-2 gap-1.5'>
+        <div className='mt-3 grid w-full min-w-0 max-w-full grid-cols-2 gap-1.5 overflow-hidden'>
           {tabs.map((tab) => (
             <button
               key={tab.id}
               type='button'
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex h-8 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium transition-colors',
+                'flex h-8 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-md border px-2 text-xs font-medium transition-colors',
                 activeTab === tab.id
                   ? 'border-border bg-secondary text-foreground shadow-sm'
                   : 'border-border/60 bg-transparent text-muted-foreground hover:border-border hover:text-foreground',
               )}
             >
-              <span>{tab.label}</span>
+              <span className='min-w-0 truncate'>{tab.label}</span>
               {tab.count ? (
-                <Badge variant='secondary' className='px-1.5 py-0 text-[10px]'>
+                <Badge variant='secondary' className='shrink-0 px-1.5 py-0 text-[10px]'>
                   {tab.count}
                 </Badge>
               ) : null}
@@ -272,7 +273,7 @@ export const WorkspacePanel = memo(function WorkspacePanelComponent({
         canBrowseFiles ? (
           <SessionFilesPanel
             key={`workspace-files:${sessionId}`}
-            className='min-h-0 flex-1'
+            className='min-h-0 min-w-0 flex-1 overflow-hidden'
             sessionId={sessionId ?? ''}
             workDir={currentSession?.workDir}
             onClose={onClose ?? (() => setActiveTab('overview'))}
@@ -290,8 +291,11 @@ export const WorkspacePanel = memo(function WorkspacePanelComponent({
           </PanelBody>
         )
       ) : (
-        <ScrollArea className='min-h-0 flex-1'>
-          <div className='space-y-3 p-3'>
+        <ScrollArea
+          className='min-h-0 min-w-0 max-w-full flex-1 overflow-x-hidden'
+          viewportClassName='min-w-0 max-w-full overflow-x-hidden [&>div]:!block [&>div]:!min-w-0 [&>div]:!w-full [&>div]:!max-w-full [&>div]:!overflow-x-hidden'
+        >
+          <div className='w-full min-w-0 max-w-full space-y-3 overflow-x-hidden p-3'>
             {activeTab === 'overview' ? (
               <OverviewTab
                 sessionId={sessionId}
@@ -321,7 +325,7 @@ export const WorkspacePanel = memo(function WorkspacePanelComponent({
   );
 });
 function PanelBody({ children }: { children: ReactNode }) {
-  return <div className='min-h-0 flex-1 p-3'>{children}</div>;
+  return <div className='min-h-0 min-w-0 flex-1 overflow-hidden p-3'>{children}</div>;
 }
 
 function OverviewTab({
@@ -354,7 +358,7 @@ function OverviewTab({
   return (
     <>
       <SectionCard title='Activity' icon={<SparklesIcon className='size-4' />}>
-        <div className='space-y-3 text-sm'>
+        <div className='min-w-0 space-y-3 overflow-hidden text-sm'>
           <StatusRow label='State' value={streamSnapshot.activity.description} />
           <StatusRow
             label='Connection'
@@ -366,7 +370,7 @@ function OverviewTab({
           />
           <StatusRow label='Chat' value={streamSnapshot.chatStatus} />
           {streamSnapshot.errorMessage ? (
-            <p className='rounded-md border border-destructive/20 bg-destructive/5 px-2.5 py-2 text-xs text-destructive'>
+            <p className='min-w-0 overflow-hidden break-words rounded-md border border-destructive/20 bg-destructive/5 px-2.5 py-2 text-xs text-destructive'>
               {streamSnapshot.errorMessage}
             </p>
           ) : null}
@@ -374,14 +378,14 @@ function OverviewTab({
       </SectionCard>
 
       <SectionCard title='Context' icon={<FileTextIcon className='size-4' />}>
-        <div className='space-y-2'>
-          <div className='flex items-center justify-between text-xs'>
+        <div className='min-w-0 space-y-2 overflow-hidden'>
+          <div className='flex min-w-0 items-center justify-between text-xs'>
             <span className='text-muted-foreground'>Usage</span>
             <span className='font-medium'>{usagePercent.toFixed(1)}%</span>
           </div>
           <Progress value={usagePercent} />
           {streamSnapshot.tokenUsage ? (
-            <div className='grid grid-cols-2 gap-2 text-xs text-muted-foreground'>
+            <div className='grid w-full min-w-0 max-w-full grid-cols-[repeat(auto-fit,minmax(88px,1fr))] gap-2 overflow-hidden text-xs text-muted-foreground'>
               <StatusPill label='Input' value={formatInputTokens(streamSnapshot.tokenUsage)} />
               <StatusPill label='Output' value={formatNumber(streamSnapshot.tokenUsage.output)} />
             </div>
@@ -390,13 +394,13 @@ function OverviewTab({
       </SectionCard>
 
       <SectionCard title='Session' icon={<FolderIcon className='size-4' />}>
-        <div className='space-y-2 text-xs'>
+        <div className='min-w-0 space-y-2 overflow-hidden text-xs'>
           <StatusRow label='Title' value={currentSession?.title ?? 'Loading...'} />
           <StatusRow label='Work dir' value={currentSession?.workDir ?? 'Not available'} />
         </div>
       </SectionCard>
 
-      <div className='grid grid-cols-3 gap-2'>
+      <div className='grid w-full min-w-0 max-w-full grid-cols-[repeat(auto-fit,minmax(88px,1fr))] gap-2 overflow-hidden'>
         <MetricCard label='Changes' value={changedFiles} />
         <MetricCard label='Tasks' value={todoCount} />
         <MetricCard label='Requests' value={streamSnapshot.pendingRequests.total} />
@@ -404,11 +408,11 @@ function OverviewTab({
 
       {newFiles.length > 0 ? (
         <SectionCard title='Recent files' icon={<FileTextIcon className='size-4' />}>
-          <div className='space-y-1'>
+          <div className='min-w-0 space-y-1 overflow-hidden'>
             {newFiles.slice(-5).map((path) => (
               <div
                 key={path}
-                className='truncate rounded-md bg-muted/50 px-2 py-1 text-xs'
+                className='min-w-0 truncate rounded-md bg-muted/50 px-2 py-1 text-xs'
                 title={path}
               >
                 {path}
@@ -473,16 +477,16 @@ function ChangesTab({
       ) : null}
 
       {stats?.isGitRepo && stats.hasChanges ? (
-        <div className='space-y-3'>
-          <div className='grid grid-cols-3 gap-2'>
+        <div className='min-w-0 space-y-3 overflow-hidden'>
+          <div className='grid w-full min-w-0 max-w-full grid-cols-[repeat(auto-fit,minmax(88px,1fr))] gap-2 overflow-hidden'>
             <MetricCard label='Files' value={files.length} />
             <MetricCard label='Added' value={`+${stats.totalAdditions ?? 0}`} tone='success' />
             <MetricCard label='Deleted' value={`-${stats.totalDeletions ?? 0}`} tone='danger' />
           </div>
-          <div className='space-y-1.5'>
+          <div className='min-w-0 space-y-1.5 overflow-hidden'>
             {files.map((file) => (
-              <div key={file.path} className='rounded-lg border bg-card/60 px-2.5 py-2 text-xs'>
-                <div className='flex items-center gap-2'>
+              <div key={file.path} className='min-w-0 overflow-hidden rounded-lg border bg-card/60 px-2.5 py-2 text-xs'>
+                <div className='flex min-w-0 items-center gap-2'>
                   <FileTextIcon className='size-3.5 shrink-0 text-muted-foreground' />
                   <span className='min-w-0 flex-1 truncate' title={file.path}>
                     {file.path}
@@ -523,9 +527,9 @@ function RequestsTab({ counts }: { counts: WorkspacePendingRequestCounts }) {
   return (
     <SectionCard title='Requests' icon={<BellIcon className='size-4' />}>
       {counts.total > 0 ? (
-        <div className='space-y-2'>
+        <div className='min-w-0 space-y-2 overflow-hidden'>
           <Notice kind='warning' text='Kimi is waiting for your response in the chat area.' />
-          <div className='grid grid-cols-2 gap-2'>
+          <div className='grid w-full min-w-0 max-w-full grid-cols-[repeat(auto-fit,minmax(88px,1fr))] gap-2 overflow-hidden'>
             <MetricCard label='Approvals' value={counts.approvals} tone='warning' />
             <MetricCard label='Questions' value={counts.questions} tone='warning' />
           </div>
@@ -552,22 +556,22 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className='rounded-xl border bg-card/60 p-3 shadow-sm'>
-      <div className='mb-3 flex items-center justify-between gap-2'>
+    <section className='w-full min-w-0 max-w-full overflow-hidden rounded-xl border bg-card/60 p-3 shadow-sm'>
+      <div className='mb-3 flex min-w-0 items-center justify-between gap-2'>
         <div className='flex min-w-0 items-center gap-2 text-sm font-semibold'>
-          <span className='text-muted-foreground'>{icon}</span>
+          <span className='shrink-0 text-muted-foreground'>{icon}</span>
           <span className='truncate'>{title}</span>
         </div>
-        {action}
+        {action ? <div className='shrink-0'>{action}</div> : null}
       </div>
-      {children}
+      <div className='min-w-0 overflow-hidden'>{children}</div>
     </section>
   );
 }
 
 function StatusRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className='flex items-start justify-between gap-3'>
+    <div className='flex min-w-0 items-start justify-between gap-3'>
       <span className='shrink-0 text-muted-foreground'>{label}</span>
       <span className='min-w-0 truncate text-right font-medium' title={value}>
         {value}
@@ -578,9 +582,11 @@ function StatusRow({ label, value }: { label: string; value: string }) {
 
 function StatusPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className='rounded-md border bg-background/60 px-2 py-1.5'>
-      <div className='text-[10px] uppercase tracking-wide text-muted-foreground'>{label}</div>
-      <div className='mt-0.5 font-mono text-foreground'>{value}</div>
+    <div className='w-full min-w-0 max-w-full overflow-hidden rounded-md border bg-background/60 px-2 py-1.5'>
+      <div className='truncate text-[10px] uppercase tracking-wide text-muted-foreground'>{label}</div>
+      <div className='mt-0.5 truncate font-mono text-foreground' title={value}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -595,14 +601,15 @@ function MetricCard({
   tone?: MetricTone;
 }) {
   return (
-    <div className='rounded-xl border bg-card/60 p-2 text-center'>
+    <div className='w-full min-w-0 max-w-full overflow-hidden rounded-xl border bg-card/60 p-2 text-center'>
       <div
         className={cn(
-          'text-base font-semibold',
+          'truncate text-base font-semibold',
           tone === 'success' && 'text-emerald-600 dark:text-emerald-400',
           tone === 'danger' && 'text-destructive',
           tone === 'warning' && 'text-yellow-600 dark:text-yellow-400',
         )}
+        title={String(value)}
       >
         {value}
       </div>
@@ -617,7 +624,7 @@ function Notice({ kind, text }: { kind: 'muted' | 'success' | 'warning' | 'error
   return (
     <div
       className={cn(
-        'flex items-start gap-2 rounded-lg border px-2.5 py-2 text-xs',
+        'flex min-w-0 items-start gap-2 overflow-hidden rounded-lg border px-2.5 py-2 text-xs',
         kind === 'muted' && 'bg-muted/40 text-muted-foreground',
         kind === 'success' && 'border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300',
         kind === 'warning' && 'border-yellow-500/20 bg-yellow-500/5 text-yellow-700 dark:text-yellow-300',
@@ -625,7 +632,7 @@ function Notice({ kind, text }: { kind: 'muted' | 'success' | 'warning' | 'error
       )}
     >
       {kind === 'error' ? <AlertTriangleIcon className='mt-0.5 size-3.5 shrink-0' /> : null}
-      <span>{text}</span>
+      <span className='min-w-0 break-words'>{text}</span>
     </div>
   );
 }

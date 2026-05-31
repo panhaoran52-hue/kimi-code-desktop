@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.metadata
+import json
 import sys
 from uuid import UUID
 
@@ -53,6 +55,26 @@ def desktop_api_server() -> None:
     handle_desktop_api_server()
 
 
+def desktop_runtime_info() -> None:
+    """Emit bundled Kimi CLI runtime information for installed desktop checks."""
+    import kimi_cli
+
+    try:
+        from kimi_cli.constant import get_version
+
+        version = get_version()
+    except Exception:
+        version = importlib.metadata.version("kimi-cli")
+
+    info = {
+        "available": True,
+        "kimiCliVersion": version,
+        "kimiCliPackagePath": str(kimi_cli.__file__),
+        "executable": sys.executable,
+    }
+    print(json.dumps(info), flush=True)
+
+
 def run_typer_cli(args: list[str]) -> int | None:
     import typer
 
@@ -68,6 +90,9 @@ def run_typer_cli(args: list[str]) -> int | None:
 
 def main() -> int | None:
     args = sys.argv[1:]
+    if args[:1] == ["__desktop-runtime-info"]:
+        desktop_runtime_info()
+        return 0
     if args[:1] == ["__desktop-api-server"]:
         desktop_api_server()
         return 0

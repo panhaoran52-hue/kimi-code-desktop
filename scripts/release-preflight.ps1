@@ -6,6 +6,8 @@ $ErrorActionPreference = "Stop"
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $SidecarExe = Join-Path $ProjectRoot "src-tauri\sidecar\kimi-sidecar-x86_64-pc-windows-msvc.exe"
+$SidecarManifest = Join-Path $ProjectRoot "src-tauri\sidecar\kimi-sidecar.manifest.json"
+$TauriConfig = Join-Path $ProjectRoot "src-tauri\tauri.conf.json"
 
 function Invoke-Step {
     param(
@@ -16,6 +18,20 @@ function Invoke-Step {
     Write-Host ""
     Write-Host "==> $Name"
     & $Action
+}
+
+function Invoke-Native {
+    param(
+        [string]$Command,
+        [string[]]$Arguments = @()
+    )
+
+    & $Command @Arguments
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        $commandText = (@($Command) + $Arguments) -join " "
+        throw "Command failed with exit code $exitCode`: $commandText"
+    }
 }
 
 function Invoke-SecretScan {
@@ -69,6 +85,55 @@ function Test-CargoClippy {
     }
 
     return $exitCode -eq 0
+}
+
+function Assert-SidecarManifest {
+    if (!(Test-Path $SidecarExe)) {
+        throw "Missing sidecar executable: $SidecarExe. Run npm run sidecar:build before releasing."
+    }
+    if (!(Test-Path $SidecarManifest)) {
+        throw "Missing sidecar manifest: $SidecarManifest. Run npm run sidecar:build before releasing."
+    }
+
+    $manifest = Get-Content $SidecarManifest -Raw | ConvertFrom-Json
+    $hash = (Get-FileHash -Algorithm SHA256 $SidecarExe).Hash
+    if ($manifest.sha256 -ne $hash) {
+        throw "Sidecar manifest hash does not match $SidecarExe. Run npm run sidecar:build."
+    }
+
+    $sizeMb = [math]::Round((Get-Item $SidecarExe).Length / 1MB, 2)
+    Write-Host "Sidecar found: $SidecarExe ($sizeMb MiB)"
+    Write-Host "Sidecar manifest: $SidecarManifest"
+}
+
+function Assert-TauriWindowUrls {
+    if (!(Test-Path $TauriConfig)) {
+        throw "Missing Tauri config: $TauriConfig"
+    }
+
+    $config = Get-Content $TauriConfig -Raw | ConvertFrom-Json
+    $windows = @($config.app.windows)
+    if (-not $windows) {
+        Write-Host "No Tauri app windows declared."
+        return
+    }
+
+    foreach ($window in $windows) {
+        $label = if ($window.label) { $window.label } else { "<unnamed>" }
+        $url = $window.url
+
+        if ($null -eq $url -or [string]::IsNullOrWhiteSpace([string]$url)) {
+            Write-Host "Tauri window '$label' uses the default local entry: index.html"
+            continue
+        }
+
+        $urlText = ([string]$url).Trim()
+        if ($urlText -match "^[A-Za-z][A-Za-z0-9+.-]*://") {
+            throw "Invalid Tauri window url for '$label': $urlText. Packaged releases must use 'index.html' or another relative app asset path."
+        }
+    }
+
+    Write-Host "Tauri window URLs are local asset paths."
 }
 
 function Invoke-GitQuiet {
@@ -127,33 +192,49 @@ function Show-GitState {
 
 Push-Location $ProjectRoot
 try {
+    Invoke-Step "Building sidecar binary" {
+        Invoke-Native "npm" @("run", "sidecar:build")
+    }
+
     Invoke-Step "Checking required sidecar binary" {
-        if (!(Test-Path $SidecarExe)) {
-            throw "Missing sidecar executable: $SidecarExe. Run scripts\build-sidecar.ps1 before releasing."
-        }
-        $sizeMb = [math]::Round((Get-Item $SidecarExe).Length / 1MB, 2)
-        Write-Host "Sidecar found: $SidecarExe ($sizeMb MiB)"
+        Assert-SidecarManifest
+    }
+
+    Invoke-Step "Checking Tauri packaged window entry" {
+        Assert-TauriWindowUrls
+    }
+
+    Invoke-Step "Frontend unit tests" {
+        Invoke-Native "npm" @("run", "test")
+    }
+
+    Invoke-Step "Version alignment check" {
+        Invoke-Native "node" @("scripts/sync-version.js")
     }
 
     Invoke-Step "Frontend production build" {
-        npm run build
+        Invoke-Native "npm" @("run", "build")
     }
 
     Invoke-Step "Rust check" {
-        npm run rust:check
+        Invoke-Native "npm" @("run", "rust:check")
     }
 
     Invoke-Step "Rust clippy lint gate" {
         if (-not (Test-CargoClippy)) {
             throw "cargo-clippy is not installed. Run: rustup component add clippy"
         }
-        npm run rust:clippy
+        Invoke-Native "npm" @("run", "rust:clippy")
+    }
+
+    Invoke-Step "Tauri no-bundle release build" {
+        Invoke-Native "npm" @("run", "desktop:release")
     }
 
     Invoke-Step "Python sidecar compile check" {
         Push-Location (Join-Path $ProjectRoot "sidecar-adapter")
         try {
-            python -m compileall -q kimi_desktop_sidecar
+            Invoke-Native "python" @("-m", "compileall", "-q", "kimi_desktop_sidecar")
         } finally {
             Pop-Location
         }
@@ -162,14 +243,14 @@ try {
     Invoke-Step "Python sidecar tests" {
         Push-Location (Join-Path $ProjectRoot "sidecar-adapter")
         try {
-            uv run pytest -q
+            Invoke-Native "uv" @("run", "pytest", "-q")
         } finally {
             Pop-Location
         }
     }
 
     Invoke-Step "Dependency audit gate" {
-        npm audit --audit-level=high
+        Invoke-Native "npm" @("audit", "--audit-level=high")
     }
 
     Invoke-Step "High-confidence secret scan" {

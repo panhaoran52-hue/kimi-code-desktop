@@ -6,6 +6,7 @@ import {
   EyeOff,
   FileCode2,
   Globe2,
+  Info,
   LogIn,
   Plus,
   RefreshCcw,
@@ -57,13 +58,14 @@ import {
   updateConfigTomlFile,
   updateMcpConfigFile,
 } from "@/lib/settings-api";
+import { desktopVersion, resolveKimiCliVersion } from "@/lib/version";
 
 type SettingsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
-type SettingsSection = "model" | "general" | "mcp" | "skills" | "advanced";
+type SettingsSection = "model" | "general" | "mcp" | "skills" | "advanced" | "about";
 
 const PROVIDER_TYPES = ["kimi", "openai_legacy", "anthropic", "gemini", "vertexai"];
 const KIMI_PROVIDER_TYPE = "kimi";
@@ -111,6 +113,7 @@ const SETTINGS_SECTIONS: Array<{
   { id: "mcp", label: "MCP", icon: Server },
   { id: "skills", label: "Skills", icon: BookOpen },
   { id: "advanced", label: "Config", icon: FileCode2 },
+  { id: "about", label: "About", icon: Info },
 ];
 
 function escapeRegExp(value: string): string {
@@ -658,7 +661,7 @@ export function SettingsDialog({
     isUpdating: isGlobalConfigUpdating,
     refresh: refreshGlobalConfig,
     update: updateGlobalConfig,
-  } = useGlobalConfig();
+  } = useGlobalConfig({ enabled: open });
   const { theme, setTheme } = useTheme();
   const { uiLanguage, setUiLanguage } = useI18n();
 
@@ -679,9 +682,31 @@ export function SettingsDialog({
   const [modelKeyDraft, setModelKeyDraft] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [isOpeningKimiLogin, setIsOpeningKimiLogin] = useState(false);
+  const [pendingUiLanguage, setPendingUiLanguage] =
+    useState<UiLanguage>(uiLanguage);
+  const [originalUiLanguage, setOriginalUiLanguage] =
+    useState<UiLanguage>(uiLanguage);
+  const [pendingTheme, setPendingTheme] = useState<Theme>(theme);
+  const [originalTheme, setOriginalTheme] = useState<Theme>(theme);
 
   const configDirty = configToml !== originalConfigToml;
   const mcpDirty = mcpJson !== originalMcpJson;
+  const preferencesDirty =
+    pendingUiLanguage !== originalUiLanguage || pendingTheme !== originalTheme;
+  const settingsDirty = configDirty || preferencesDirty;
+
+  const footerStatusText = useMemo(() => {
+    if (settingsDirty && mcpDirty) {
+      return "Unsaved settings and MCP changes";
+    }
+    if (settingsDirty) {
+      return "Unsaved settings";
+    }
+    if (mcpDirty) {
+      return "Unsaved MCP changes";
+    }
+    return "Saved";
+  }, [mcpDirty, settingsDirty]);
 
   const currentModel = useMemo(() => {
     if (!config) {
@@ -810,6 +835,10 @@ export function SettingsDialog({
     if (!open) {
       return;
     }
+    setPendingUiLanguage(uiLanguage);
+    setOriginalUiLanguage(uiLanguage);
+    setPendingTheme(theme);
+    setOriginalTheme(theme);
     loadConfigFiles();
     refreshGlobalConfig();
   }, [loadConfigFiles, open, refreshGlobalConfig]);
@@ -1076,27 +1105,67 @@ export function SettingsDialog({
     [selectedModelConfig, updateSelectedModelValue],
   );
 
+  const resetPendingPreferences = useCallback(() => {
+    setPendingUiLanguage(uiLanguage);
+    setOriginalUiLanguage(uiLanguage);
+    setPendingTheme(theme);
+    setOriginalTheme(theme);
+  }, [theme, uiLanguage]);
+
+  const handleReloadSettings = useCallback(async () => {
+    await loadConfigFiles();
+    resetPendingPreferences();
+  }, [loadConfigFiles, resetPendingPreferences]);
+
   const saveConfigToml = useCallback(async () => {
+    if (!settingsDirty) {
+      return;
+    }
+
     setIsSavingConfig(true);
     try {
-      const response = await updateConfigTomlFile(configToml);
-      if (!response.success) {
-        throw new Error(response.error ?? "Failed to save config.toml");
+      if (configDirty) {
+        const response = await updateConfigTomlFile(configToml);
+        if (!response.success) {
+          throw new Error(response.error ?? "Failed to save config.toml");
+        }
+        setOriginalConfigToml(configToml);
+        window.dispatchEvent(new Event("kimi:config-update"));
+        await refreshGlobalConfig();
       }
-      setOriginalConfigToml(configToml);
-      window.dispatchEvent(new Event("kimi:config-update"));
-      await refreshGlobalConfig();
-      toast.success("config.toml saved");
+
+      if (preferencesDirty) {
+        setUiLanguage(pendingUiLanguage);
+        setTheme(pendingTheme);
+        setOriginalUiLanguage(pendingUiLanguage);
+        setOriginalTheme(pendingTheme);
+      }
+
+      toast.success(configDirty ? "Settings saved" : "Preferences saved");
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to save config.toml";
-      toast.error("Failed to save config.toml", { description: message });
+        error instanceof Error ? error.message : "Failed to save settings";
+      toast.error("Failed to save settings", { description: message });
     } finally {
       setIsSavingConfig(false);
     }
-  }, [configToml, refreshGlobalConfig]);
+  }, [
+    configDirty,
+    configToml,
+    pendingTheme,
+    pendingUiLanguage,
+    preferencesDirty,
+    refreshGlobalConfig,
+    settingsDirty,
+    setTheme,
+    setUiLanguage,
+  ]);
 
   const saveMcpJson = useCallback(async () => {
+    if (!mcpDirty) {
+      return;
+    }
+
     setIsSavingMcp(true);
     try {
       const normalized = normalizeMcpJson(mcpJson);
@@ -1114,7 +1183,7 @@ export function SettingsDialog({
     } finally {
       setIsSavingMcp(false);
     }
-  }, [mcpJson]);
+  }, [mcpDirty, mcpJson]);
 
   const handleOpenKimiLogin = useCallback(async () => {
     if (!isTauri()) {
@@ -1841,8 +1910,10 @@ export function SettingsDialog({
                   Interface language
                 </label>
                 <Select
-                  value={uiLanguage}
-                  onValueChange={(value) => setUiLanguage(value as UiLanguage)}
+                  value={pendingUiLanguage}
+                  onValueChange={(value) =>
+                    setPendingUiLanguage(value as UiLanguage)
+                  }
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -1859,7 +1930,10 @@ export function SettingsDialog({
                 <label className="text-xs font-semibold text-muted-foreground">
                   App theme
                 </label>
-                <Select value={theme} onValueChange={(value) => setTheme(value as Theme)}>
+                <Select
+                  value={pendingTheme}
+                  onValueChange={(value) => setPendingTheme(value as Theme)}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -1872,7 +1946,7 @@ export function SettingsDialog({
 
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-muted-foreground">
-                  CLI theme
+                  CLI session theme
                 </label>
                 <Select
                   value={cliTheme}
@@ -1984,7 +2058,7 @@ export function SettingsDialog({
                 onChange={(event) =>
                   handleExtraSkillDirsChange(event.currentTarget.value)
                 }
-                placeholder="C:\\Users\\administer\\.agents\\skills"
+                placeholder="%USERPROFILE%\\.agents\\skills"
                 spellCheck={false}
                 className="min-h-36 resize-none font-mono text-xs"
               />
@@ -2003,6 +2077,8 @@ export function SettingsDialog({
             />
           </div>
         );
+      case "about":
+        return <AboutSection />;
     }
   };
 
@@ -2059,25 +2135,35 @@ export function SettingsDialog({
         <DialogFooter className="border-t px-5 py-3">
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-xs text-muted-foreground">
-              {configDirty || mcpDirty ? "Unsaved changes" : "Saved"}
+              {footerStatusText}
             </div>
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
-                onClick={loadConfigFiles}
+                onClick={handleReloadSettings}
                 disabled={isLoadingFiles || isSavingConfig || isSavingMcp}
               >
                 <RefreshCcw className="size-4" />
                 Reload
               </Button>
+              {mcpDirty ? (
+                <Button
+                  type="button"
+                  onClick={saveMcpJson}
+                  disabled={isSavingMcp}
+                >
+                  <Save className="size-4" />
+                  Save MCP
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 onClick={saveConfigToml}
-                disabled={!configDirty || isSavingConfig}
+                disabled={!settingsDirty || isSavingConfig}
               >
                 <Save className="size-4" />
-                Save config
+                Save settings
               </Button>
             </div>
           </div>
@@ -2133,6 +2219,31 @@ function EmptyState({ label }: { label: string }): ReactElement {
   return (
     <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed px-3 text-center text-xs text-muted-foreground">
       {label}
+    </div>
+  );
+}
+
+function AboutSection(): ReactElement {
+  const [cliVersion, setCliVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    resolveKimiCliVersion()
+      .then((v) => setCliVersion(v))
+      .catch(() => setCliVersion(null));
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex min-h-12 items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2">
+        <span className="text-sm font-medium">Kimi Code Desktop</span>
+        <span className="text-xs text-muted-foreground">v{desktopVersion}</span>
+      </div>
+      <div className="flex min-h-12 items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2">
+        <span className="text-sm font-medium">Kimi CLI Runtime</span>
+        <span className="text-xs text-muted-foreground">
+          {cliVersion ? `v${cliVersion}` : "Loading..."}
+        </span>
+      </div>
     </div>
   );
 }

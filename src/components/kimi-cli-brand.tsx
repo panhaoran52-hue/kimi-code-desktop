@@ -4,7 +4,7 @@ import {
   openKimiCodeWebsite,
   shouldInterceptKimiCodeLink,
 } from "@/lib/kimi-code-link";
-import { kimiCliVersion, resolveKimiCliVersion } from "@/lib/version";
+import { desktopVersion, kimiCliVersion, resolveKimiCliVersion } from "@/lib/version";
 import { cn } from "@/lib/utils";
 
 type KimiCliBrandProps = {
@@ -18,9 +18,9 @@ export function KimiCliBrand({
   size = "md",
   showVersion = true,
 }: KimiCliBrandProps) {
-  const [version, setVersion] = useState(kimiCliVersion);
+  const [cliVersion, setCliVersion] = useState(kimiCliVersion);
   const textSizeClass = size === "sm" ? "text-base" : "text-lg";
-  const versionPadding = size === "sm" ? "text-xs" : "text-sm";
+  const versionPadding = size === "sm" ? "text-[10px]" : "text-xs";
   const logoSize = size === "sm" ? "size-6" : "size-7";
   const logoPx = size === "sm" ? 24 : 28;
 
@@ -32,7 +32,7 @@ export function KimiCliBrand({
     let isMounted = true;
     resolveKimiCliVersion().then((resolvedVersion) => {
       if (isMounted) {
-        setVersion(resolvedVersion);
+        setCliVersion(resolvedVersion);
       }
     });
 
@@ -72,9 +72,13 @@ export function KimiCliBrand({
       </a>
       {showVersion && (
         <span
-          className={cn("text-muted-foreground font-medium", versionPadding)}
+          className={cn("text-muted-foreground font-medium leading-tight", versionPadding)}
+          title={`Desktop ${desktopVersion} · CLI ${cliVersion}`}
         >
-          v{version}
+          <span className="opacity-80">v{desktopVersion}</span>
+          <span className="mx-0.5 opacity-40">·</span>
+          <span className="opacity-60">CLI</span>
+          <span className="opacity-60">{cliVersion === "dev" ? "dev" : ` ${cliVersion}`}</span>
         </span>
       )}
     </div>

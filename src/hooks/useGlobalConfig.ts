@@ -42,6 +42,10 @@ function invalidateGlobalConfigCache(): void {
   _cachedConfig = null;
 }
 
+export type UseGlobalConfigOptions = {
+  enabled?: boolean;
+};
+
 export type UseGlobalConfigReturn = {
   config: GlobalConfig | null;
   isLoading: boolean;
@@ -51,7 +55,10 @@ export type UseGlobalConfigReturn = {
   update: (args: UpdateGlobalConfigArgs) => Promise<UpdateGlobalConfigResponse>;
 };
 
-export function useGlobalConfig(): UseGlobalConfigReturn {
+export function useGlobalConfig(
+  options: UseGlobalConfigOptions = {},
+): UseGlobalConfigReturn {
+  const enabled = options.enabled ?? true;
   const [config, setConfig] = useState<GlobalConfig | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -125,21 +132,27 @@ export function useGlobalConfig(): UseGlobalConfigReturn {
   );
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
     if (isInitializedRef.current) {
       return;
     }
     isInitializedRef.current = true;
     loadConfig();
-  }, [loadConfig]);
+  }, [enabled, loadConfig]);
 
   // Re-fetch config when another tab/session changes it (broadcast via custom event)
   useEffect(() => {
     const handler = () => {
+      if (!enabled) {
+        return;
+      }
       loadConfig(true);
     };
     window.addEventListener("kimi:config-update", handler);
     return () => window.removeEventListener("kimi:config-update", handler);
-  }, [loadConfig]);
+  }, [enabled, loadConfig]);
 
   return {
     config,

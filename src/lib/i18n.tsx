@@ -26,6 +26,7 @@ const ZH_CN_TRANSLATIONS: Record<string, string> = {
   "Add to provider": "添加到提供商",
   "Agent Monitor": "Agent 监控",
   "Allow this": "允许此操作",
+  About: "关于",
   "API key": "API 密钥",
   "API key override": "API Key 覆盖",
   "API model": "API 模型",
@@ -44,6 +45,7 @@ const ZH_CN_TRANSLATIONS: Record<string, string> = {
   "Attach files": "附加文件",
   Attachment: "附件",
   "Attachment preview": "附件预览",
+  Available: "可用",
   "Base URL": "Base URL",
   "Base URL override": "Base URL 覆盖",
   basic: "基础",
@@ -60,6 +62,7 @@ const ZH_CN_TRANSLATIONS: Record<string, string> = {
   "Choose app to open working directory": "选择打开工作目录的应用",
   "Clear search": "清空搜索",
   "CLI theme": "CLI 主题",
+  "CLI session theme": "CLI 会话主题",
   "Click the + button in the sidebar to start a new session":
     "点击侧边栏中的 + 按钮开始新会话",
   Close: "关闭",
@@ -133,6 +136,7 @@ const ZH_CN_TRANSLATIONS: Record<string, string> = {
   "Failed to save config.toml": "保存 config.toml 失败",
   "Failed to save mcp.json": "保存 mcp.json 失败",
   "Failed to save model": "保存模型失败",
+  "Failed to save settings": "保存设置失败",
   "Failed to save thinking": "保存思考模式失败",
   "Failed to update global model": "更新全局模型失败",
   "Failed to update global thinking": "更新全局思考模式失败",
@@ -149,6 +153,7 @@ const ZH_CN_TRANSLATIONS: Record<string, string> = {
   "Fork Session": "派生会话",
   "Fork session from this point": "从此处派生会话",
   Format: "格式化",
+  "Forced by model": "由模型强制启用",
   "Finish login in the terminal, then reload settings.":
     "请在终端中完成登录，然后重新加载设置。",
   "Full size preview": "全尺寸预览",
@@ -164,12 +169,14 @@ const ZH_CN_TRANSLATIONS: Record<string, string> = {
   "Global model updated": "全局模型已更新",
   "Grouped by folder": "按文件夹分组",
   "Grouped view": "分组视图",
+  "Hide API key": "隐藏 API 密钥",
   Hunk: "变更块",
   Image: "图片",
   Input: "输入",
   "Input Tokens": "输入 Token",
   "Interface language": "界面语言",
   "Invalid MCP JSON": "MCP JSON 无效",
+  "Invalid JSON": "JSON 无效",
   Invoke: "调用",
   "Invoke /skill:": "调用 /skill：",
   "Jump to message": "跳转到消息",
@@ -197,6 +204,7 @@ const ZH_CN_TRANSLATIONS: Record<string, string> = {
   "mcp.json saved": "mcp.json 已保存",
   "Media preview": "媒体预览",
   "Message queued": "消息已排队",
+  "Merge all available skills": "合并全部可用技能",
   "Model context usage": "模型上下文用量",
   "Model key": "模型键",
   "Model key already exists": "模型键已存在",
@@ -240,6 +248,7 @@ const ZH_CN_TRANSLATIONS: Record<string, string> = {
   "Path copied": "路径已复制",
   Plan: "计划",
   "Plan Preview": "计划预览",
+  "Preferences saved": "偏好设置已保存",
   "Previous branch": "上一个分支",
   "Previous slide": "上一张幻灯片",
   Provider: "提供商",
@@ -279,6 +288,8 @@ const ZH_CN_TRANSLATIONS: Record<string, string> = {
   Save: "保存",
   "Save config": "保存配置",
   "Save MCP": "保存 MCP",
+  "Save settings": "保存设置",
+  "Save config to apply this model definition.": "保存配置后应用此模型定义。",
   Saved: "已保存",
   "Search directories or type a path...": "搜索目录或输入路径...",
   "Search directories or type a new path": "搜索目录或输入新路径",
@@ -308,6 +319,8 @@ const ZH_CN_TRANSLATIONS: Record<string, string> = {
   Session: "会话",
   Sessions: "会话",
   Settings: "设置",
+  "Settings saved": "设置已保存",
+  "Show API key": "显示 API 密钥",
   "Show thinking stream": "显示思考流",
   "Side Chat": "侧聊",
   "Skills Library": "技能库",
@@ -353,6 +366,9 @@ const ZH_CN_TRANSLATIONS: Record<string, string> = {
   Unavailable: "不可用",
   "Unknown Session": "未知会话",
   "Unsaved changes": "有未保存的更改",
+  "Unsaved MCP changes": "MCP 有未保存的更改",
+  "Unsaved settings": "设置有未保存的更改",
+  "Unsaved settings and MCP changes": "设置和 MCP 都有未保存的更改",
   Untitled: "未命名",
   Up: "上一级",
   Upload: "上传",
@@ -523,7 +539,7 @@ function applyTextNodeTranslation(
   language: ResolvedUiLanguage,
 ): void {
   const current = node.nodeValue ?? "";
-  if (!current.trim() || !/[A-Za-z]/.test(current)) {
+  if (!current.trim()) {
     return;
   }
 
@@ -534,6 +550,10 @@ function applyTextNodeTranslation(
   let record = textRecords.get(node);
 
   if (language === "zh-CN") {
+    if (!/[A-Za-z]/.test(current) && !record) {
+      return;
+    }
+
     if (!record || current !== record.lastApplied) {
       record = { original: current, lastApplied: current };
       textRecords.set(node, record);
@@ -583,7 +603,7 @@ function applyAttributeTranslation(
   language: ResolvedUiLanguage,
 ): void {
   const current = element.getAttribute(attribute);
-  if (!current || !/[A-Za-z]/.test(current)) {
+  if (!current) {
     return;
   }
 
@@ -594,6 +614,10 @@ function applyAttributeTranslation(
   let record = getAttributeRecord(element, attribute);
 
   if (language === "zh-CN") {
+    if (!/[A-Za-z]/.test(current) && !record) {
+      return;
+    }
+
     if (!record || current !== record.lastApplied) {
       record = { original: current, lastApplied: current };
       setAttributeRecord(element, attribute, record);

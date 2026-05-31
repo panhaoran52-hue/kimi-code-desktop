@@ -1,0 +1,56 @@
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it } from "vitest";
+import {
+  translateUiString,
+  UiLanguageProvider,
+  useDomTranslations,
+  useI18n,
+} from "./i18n";
+
+function LanguageHarness() {
+  useDomTranslations();
+  const { setUiLanguage } = useI18n();
+
+  return (
+    <div>
+      <button type="button" onClick={() => setUiLanguage("zh-CN")}>
+        to zh
+      </button>
+      <button type="button" onClick={() => setUiLanguage("en-US")}>
+        to en
+      </button>
+      <button type="button" aria-label="Open settings">
+        Settings
+      </button>
+    </div>
+  );
+}
+
+describe("DOM translations", () => {
+  it("restores translated text and attributes when switching back to English", async () => {
+    const user = userEvent.setup();
+    render(
+      <UiLanguageProvider>
+        <LanguageHarness />
+      </UiLanguageProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "to zh" }));
+
+    const translatedSettings = translateUiString("Settings", "zh-CN");
+    const translatedOpenSettings = translateUiString("Open settings", "zh-CN");
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: translatedOpenSettings }).textContent).toBe(
+        translatedSettings,
+      );
+    });
+
+    await user.click(screen.getByRole("button", { name: "to en" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open settings" }).textContent).toBe("Settings");
+    });
+  });
+});

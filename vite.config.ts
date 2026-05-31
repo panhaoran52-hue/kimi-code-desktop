@@ -35,20 +35,23 @@ function readInstalledKimiCliVersion(): string | null {
   if (process.platform === "win32") {
     candidates.push(path.join(os.homedir(), ".local", "bin", "kimi.exe"));
   }
+  const versionCommands = [["version"], ["--version"]];
 
   for (const candidate of candidates) {
-    try {
-      const output = execFileSync(candidate, ["--version"], {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        timeout: KIMI_VERSION_PROBE_TIMEOUT_MS,
-      });
-      const version = parseVersionFromOutput(output);
-      if (version) {
-        return version;
+    for (const args of versionCommands) {
+      try {
+        const output = execFileSync(candidate, args, {
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+          timeout: KIMI_VERSION_PROBE_TIMEOUT_MS,
+        });
+        const version = parseVersionFromOutput(output);
+        if (version) {
+          return version;
+        }
+      } catch {
+        // Try the next version command or candidate.
       }
-    } catch {
-      // Try the next candidate.
     }
   }
 
@@ -149,6 +152,7 @@ export default defineConfig({
   ],
   define: {
     __KIMI_CLI_VERSION__: JSON.stringify(kimiCliVersion),
+    __APP_VERSION__: JSON.stringify(readPackageVersion()),
   },
   resolve: {
     alias: {

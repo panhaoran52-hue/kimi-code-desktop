@@ -83,8 +83,8 @@ export function ChatWorkspaceHeader({
   }, [selectedSessionId, editingTitle, onRenameSession, handleCancelEdit]);
 
   return (
-    <div className="flex min-w-0 flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-3 lg:pl-8">
-      <div className="flex min-w-0 items-center gap-2">
+    <div className="flex min-w-0 flex-wrap items-center gap-2 overflow-hidden px-3 py-2 sm:px-5 sm:py-3 lg:pl-8">
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
         {onOpenSidebar ? (
           <button
             type="button"
@@ -95,7 +95,7 @@ export function ChatWorkspaceHeader({
             <PanelLeftOpen className="size-4" />
           </button>
         ) : null}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-hidden">
           {isEditing ? (
             <Input
               autoFocus
@@ -112,14 +112,14 @@ export function ChatWorkspaceHeader({
                   handleCancelEdit();
                 }
               }}
-              className="h-7 text-xs font-bold"
+              className="h-7 min-w-0 text-xs font-bold"
             />
           ) : sessionDescription ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className="truncate text-xs font-bold cursor-pointer hover:text-primary text-left bg-transparent border-none p-0"
+                  className="block max-w-full cursor-pointer truncate border-none bg-transparent p-0 text-left text-xs font-bold hover:text-primary"
                   onDoubleClick={handleDoubleClick}
                 >
                   {shortenTitle(sessionDescription, 60)}
@@ -137,11 +137,11 @@ export function ChatWorkspaceHeader({
           ) : null}
         </div>
       </div>
-      <div className="flex items-center justify-end gap-2">
+      <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">
         {selectedSessionId && (
           <>
             {currentSession?.workDir ? (
-              <div className="hidden lg:block">
+              <div className="hidden xl:block">
                 <OpenInMenu workDir={currentSession.workDir} />
               </div>
             ) : null}

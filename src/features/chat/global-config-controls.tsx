@@ -1,4 +1,11 @@
-import { useCallback, useMemo, useState, type ReactElement } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useMemo,
+  useState,
+  type ReactElement,
+} from "react";
 import { toast } from "sonner";
 import { Check, Cpu, Paperclip, RefreshCcw, Settings } from "lucide-react";
 import { usePromptInputAttachments } from "@ai-elements";
@@ -25,7 +32,12 @@ import {
   ModelSelectorTrigger,
 } from "@/components/ai-elements/model-selector";
 import { cn } from "@/lib/utils";
-import { SettingsDialog } from "@/features/settings/settings-dialog";
+
+const SettingsDialog = lazy(() =>
+  import("@/features/settings/settings-dialog").then((module) => ({
+    default: module.SettingsDialog,
+  })),
+);
 
 type ThinkingState = "enabled" | "disabled" | "forced";
 
@@ -360,7 +372,14 @@ export function GlobalConfigControls({
           </Button>
         ) : null}
       </div>
-      <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      {isSettingsOpen ? (
+        <Suspense fallback={null}>
+          <SettingsDialog
+            open={isSettingsOpen}
+            onOpenChange={setIsSettingsOpen}
+          />
+        </Suspense>
+      ) : null}
     </>
   );
 }

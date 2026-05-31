@@ -175,7 +175,8 @@ impl DesktopApiProcessManager {
                     CommandEvent::Stdout(bytes) => {
                         stdout_buf.extend_from_slice(&bytes);
                         while let Some(newline_idx) = stdout_buf.iter().position(|b| *b == b'\n') {
-                            let mut line_bytes: Vec<u8> = stdout_buf.drain(..=newline_idx).collect();
+                            let mut line_bytes: Vec<u8> =
+                                stdout_buf.drain(..=newline_idx).collect();
                             if line_bytes.last() == Some(&b'\n') {
                                 line_bytes.pop();
                             }
@@ -188,7 +189,10 @@ impl DesktopApiProcessManager {
                             match String::from_utf8(line_bytes) {
                                 Ok(line) => handle_desktop_api_response_line(&inner, &line),
                                 Err(err) => {
-                                    eprintln!("[desktop-api] dropped invalid UTF-8 stdout line: {}", err);
+                                    eprintln!(
+                                        "[desktop-api] dropped invalid UTF-8 stdout line: {}",
+                                        err
+                                    );
                                 }
                             }
                         }
@@ -291,29 +295,34 @@ impl WireProcessManager {
     pub async fn connect(&self, app: &AppHandle, session_id: String) -> Result<(), String> {
         let worker = self.get_or_create_worker(&session_id);
         if worker.child.lock().unwrap().is_none() {
-            self.start_worker(app.clone(), worker.clone(), "start").await?;
+            self.start_worker(app.clone(), worker.clone(), "start")
+                .await?;
         } else {
             emit_status_snapshot(app, &worker);
         }
         Ok(())
     }
 
-    pub async fn send(&self, app: &AppHandle, session_id: String, message: String) -> Result<(), String> {
+    pub async fn send(
+        &self,
+        app: &AppHandle,
+        session_id: String,
+        message: String,
+    ) -> Result<(), String> {
         let worker = self.get_or_create_worker(&session_id);
         if worker.child.lock().unwrap().is_none() {
-            self.start_worker(app.clone(), worker.clone(), "start").await?;
+            self.start_worker(app.clone(), worker.clone(), "start")
+                .await?;
         }
 
         let parsed: Value = serde_json::from_str(&message)
             .map_err(|e| format!("Invalid JSON-RPC message: {}", e))?;
         let method = parsed.get("method").and_then(Value::as_str);
-        let id = parsed
-            .get("id")
-            .and_then(|value| match value {
-                Value::String(s) => Some(s.clone()),
-                Value::Number(n) => Some(n.to_string()),
-                _ => None,
-            });
+        let id = parsed.get("id").and_then(|value| match value {
+            Value::String(s) => Some(s.clone()),
+            Value::Number(n) => Some(n.to_string()),
+            _ => None,
+        });
 
         match method {
             Some("prompt") => {
@@ -323,7 +332,10 @@ impl WireProcessManager {
                 {
                     let mut in_flight = worker.in_flight_prompt_ids.lock().unwrap();
                     if !in_flight.is_empty() {
-                        return Err("Session is busy; wait for completion before sending a new prompt.".into());
+                        return Err(
+                            "Session is busy; wait for completion before sending a new prompt."
+                                .into(),
+                        );
                     }
                     in_flight.insert(prompt_id);
                 }
@@ -355,9 +367,19 @@ impl WireProcessManager {
         if let Err(e) = write_result {
             if method == Some("prompt") {
                 if let Some(prompt_id) = id {
-                    worker.in_flight_prompt_ids.lock().unwrap().remove(&prompt_id);
+                    worker
+                        .in_flight_prompt_ids
+                        .lock()
+                        .unwrap()
+                        .remove(&prompt_id);
                 }
-                emit_status(app, &worker, "error", Some("stdin_write_failed"), Some(&e.to_string()));
+                emit_status(
+                    app,
+                    &worker,
+                    "error",
+                    Some("stdin_write_failed"),
+                    Some(&e.to_string()),
+                );
             }
             return Err(format!("Failed to write to wire worker: {}", e));
         }
@@ -373,7 +395,12 @@ impl WireProcessManager {
         Ok(())
     }
 
-    pub async fn stop_session(&self, app: &AppHandle, session_id: &str, reason: &str) -> Result<(), String> {
+    pub async fn stop_session(
+        &self,
+        app: &AppHandle,
+        session_id: &str,
+        reason: &str,
+    ) -> Result<(), String> {
         let worker = {
             let workers = self.inner.workers.lock().unwrap();
             workers.get(session_id).cloned()
@@ -485,7 +512,8 @@ impl WireProcessManager {
                     CommandEvent::Stdout(bytes) => {
                         stdout_buf.extend_from_slice(&bytes);
                         while let Some(newline_idx) = stdout_buf.iter().position(|b| *b == b'\n') {
-                            let mut line_bytes: Vec<u8> = stdout_buf.drain(..=newline_idx).collect();
+                            let mut line_bytes: Vec<u8> =
+                                stdout_buf.drain(..=newline_idx).collect();
                             if line_bytes.last() == Some(&b'\n') {
                                 line_bytes.pop();
                             }
@@ -497,7 +525,11 @@ impl WireProcessManager {
                             }
                             match String::from_utf8(line_bytes) {
                                 Ok(line) => {
-                                    emit_wire_message(&app_for_task, &worker_for_task.session_id, line.clone());
+                                    emit_wire_message(
+                                        &app_for_task,
+                                        &worker_for_task.session_id,
+                                        line.clone(),
+                                    );
                                     handle_worker_output(&app_for_task, &worker_for_task, &line);
                                 }
                                 Err(err) => {
@@ -568,12 +600,8 @@ impl WireProcessManager {
                 }
             }
 
-            let still_current = worker_for_task
-                .worker_id
-                .lock()
-                .unwrap()
-                .as_deref()
-                == Some(worker_id.as_str());
+            let still_current =
+                worker_for_task.worker_id.lock().unwrap().as_deref() == Some(worker_id.as_str());
             if still_current {
                 worker_for_task.child.lock().unwrap().take();
                 worker_for_task.in_flight_prompt_ids.lock().unwrap().clear();
@@ -694,13 +722,15 @@ fn handle_worker_output(app: &AppHandle, worker: &Arc<WorkerState>, line: &str) 
     let Ok(message) = serde_json::from_str::<Value>(line) else {
         eprintln!(
             "[wire:{}] ignored non-JSON stdout line: {}",
-            worker.session_id,
-            line
+            worker.session_id, line
         );
         return;
     };
 
-    let message_id = message.get("id").and_then(Value::as_str).map(str::to_string);
+    let message_id = message
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::to_string);
     let Some(message_id) = message_id else {
         return;
     };
@@ -900,7 +930,7 @@ fn cache_desktop_api_response(key: String, value: Value, ttl: Duration) {
         .insert(key, DesktopApiCacheEntry { value, expires_at });
 }
 
-fn clear_desktop_api_cache() {
+pub fn clear_desktop_api_cache() {
     desktop_api_cache().lock().unwrap().clear();
 }
 

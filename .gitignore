@@ -9,6 +9,7 @@ src-tauri/gen/
 sidecar-adapter/build/
 sidecar-adapter/dist/
 src-tauri/sidecar/*.exe
+src-tauri/sidecar/*.manifest.json
 __pycache__/
 *.py[cod]
 

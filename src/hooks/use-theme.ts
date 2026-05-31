@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 
 export type Theme = "light" | "dark";
@@ -26,6 +26,21 @@ type UseThemeResult = {
   toggleThemeWithTransition: (event?: ThemeTransitionEvent) => Promise<void>;
 };
 
+type ThemeListener = () => void;
+
+const themeListeners = new Set<ThemeListener>();
+let currentThemeState: ThemeState | null = null;
+
+function resolveSystemTheme(): Theme {
+  if (typeof window === "undefined") {
+    return "light";
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
 function getInitialTheme(): ThemeState {
   if (typeof window === "undefined") {
     return { theme: "light", hasUserPreference: false };
@@ -36,8 +51,56 @@ function getInitialTheme(): ThemeState {
     return { theme: stored, hasUserPreference: true };
   }
 
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  return { theme: prefersDark ? "dark" : "light", hasUserPreference: false };
+  return { theme: resolveSystemTheme(), hasUserPreference: false };
+}
+
+function getThemeState(): ThemeState {
+  currentThemeState ??= getInitialTheme();
+  return currentThemeState;
+}
+
+function applyThemeState(state: ThemeState): void {
+  if (typeof document !== "undefined") {
+    const root = document.documentElement;
+    root.classList.toggle("dark", state.theme === "dark");
+    root.style.colorScheme = state.theme;
+  }
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (state.hasUserPreference) {
+    window.localStorage.setItem(THEME_STORAGE_KEY, state.theme);
+  } else {
+    window.localStorage.removeItem(THEME_STORAGE_KEY);
+  }
+}
+
+function setThemeState(next: ThemeState): void {
+  const previous = getThemeState();
+  if (
+    previous.theme === next.theme &&
+    previous.hasUserPreference === next.hasUserPreference
+  ) {
+    applyThemeState(next);
+    return;
+  }
+
+  currentThemeState = next;
+  applyThemeState(next);
+  themeListeners.forEach((listener) => listener());
+}
+
+function subscribeTheme(listener: ThemeListener): () => void {
+  themeListeners.add(listener);
+  return () => {
+    themeListeners.delete(listener);
+  };
+}
+
+function getThemeSnapshot(): ThemeState {
+  return getThemeState();
 }
 
 function getTransitionPoint(
@@ -72,34 +135,25 @@ function stopThemeSwitchingNextFrame(root: HTMLElement): void {
 }
 
 export function useTheme(): UseThemeResult {
-  const [state, setState] = useState<ThemeState>(() => getInitialTheme());
-  const { theme, hasUserPreference } = state;
+  const { theme, hasUserPreference } = useSyncExternalStore(
+    subscribeTheme,
+    getThemeSnapshot,
+    getThemeSnapshot,
+  );
 
-  // Apply theme to <html> and persist user preference
   useEffect(() => {
-    if (typeof document === "undefined") return;
-    const root = document.documentElement;
-    root.classList.toggle("dark", theme === "dark");
-    root.style.colorScheme = theme;
+    applyThemeState({ theme, hasUserPreference });
+  }, [hasUserPreference, theme]);
 
-    if (hasUserPreference) {
-      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } else {
-      window.localStorage.removeItem(THEME_STORAGE_KEY);
-    }
-  }, [theme, hasUserPreference]);
-
-  // Sync with system preference only when the user has no explicit choice
   useEffect(() => {
     if (typeof window === "undefined") return;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = (event: MediaQueryListEvent) => {
-      setState((prev) => {
-        if (prev.hasUserPreference) return prev;
-        return {
-          theme: event.matches ? "dark" : "light",
-          hasUserPreference: false,
-        };
+      const previous = getThemeState();
+      if (previous.hasUserPreference) return;
+      setThemeState({
+        theme: event.matches ? "dark" : "light",
+        hasUserPreference: false,
       });
     };
 
@@ -107,15 +161,34 @@ export function useTheme(): UseThemeResult {
     return () => media.removeEventListener("change", handleChange);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== THEME_STORAGE_KEY) {
+        return;
+      }
+
+      if (event.newValue === "light" || event.newValue === "dark") {
+        setThemeState({ theme: event.newValue, hasUserPreference: true });
+      } else {
+        setThemeState({ theme: resolveSystemTheme(), hasUserPreference: false });
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
   const setTheme = useCallback((next: Theme) => {
-    setState({ theme: next, hasUserPreference: true });
+    setThemeState({ theme: next, hasUserPreference: true });
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setState((prev) => ({
-      theme: prev.theme === "dark" ? "light" : "dark",
+    const previous = getThemeState();
+    setThemeState({
+      theme: previous.theme === "dark" ? "light" : "dark",
       hasUserPreference: true,
-    }));
+    });
   }, []);
 
   const toggleThemeWithTransition = useCallback(
@@ -159,8 +232,6 @@ export function useTheme(): UseThemeResult {
 
       await transition.ready;
 
-      // Light→Dark: animate OLD (light) shrinking to reveal dark underneath
-      // Dark→Light: animate NEW (light) expanding to cover dark
       const pseudoElement = isDark
         ? "::view-transition-new(root)"
         : "::view-transition-old(root)";

@@ -132,7 +132,7 @@ function SessionsScrollerComponent(
     <div
       ref={ref}
       className={cn(
-        "flex-1 overflow-y-auto overflow-x-hidden [-webkit-overflow-scrolling:touch]  pb-4 pr-1",
+        "min-w-0 flex-1 overflow-y-auto overflow-x-hidden [-webkit-overflow-scrolling:touch] pb-4 pr-1",
         className,
       )}
       {...rest}
@@ -146,7 +146,7 @@ function SessionsListComponent(
 ) {
   const { className, ...rest } = props;
   return (
-    <div ref={ref} className={cn("flex flex-col space-y-0.5 w-full px-2 mt-1", className)} {...rest} />
+    <div ref={ref} className={cn("flex w-full min-w-0 flex-col space-y-0.5 px-2 mt-1", className)} {...rest} />
   );
 }
 
@@ -216,6 +216,7 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
 
   // Archived section expanded state
   const [isArchivedExpanded, setIsArchivedExpanded] = useState(false);
+  const hasRequestedArchivedRef = useRef(false);
 
   // Track if we're in the context menu of an archived session
   const [contextMenuIsArchived, setContextMenuIsArchived] = useState(false);
@@ -229,13 +230,6 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
   useEffect(() => {
     setSessionSearch(searchQuery);
   }, [searchQuery]);
-
-  // Load archived sessions when the section is expanded
-  useEffect(() => {
-    if (isArchivedExpanded && onRefreshArchivedSessions) {
-      onRefreshArchivedSessions();
-    }
-  }, [isArchivedExpanded, onRefreshArchivedSessions]);
 
   // Exit multi-select mode when switching between archived/non-archived
   const exitMultiSelectMode = useCallback(() => {
@@ -265,6 +259,21 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
       return new Set(sessionList.map((s) => s.id));
     });
   }, []);
+
+  const handleArchivedOpenChange = useCallback(
+    (open: boolean) => {
+      setIsArchivedExpanded(open);
+      if (!open || hasRequestedArchivedRef.current || isLoadingArchived) {
+        return;
+      }
+
+      hasRequestedArchivedRef.current = true;
+      Promise.resolve(onRefreshArchivedSessions?.()).catch(() => {
+        hasRequestedArchivedRef.current = false;
+      });
+    },
+    [isLoadingArchived, onRefreshArchivedSessions],
+  );
 
   const handleBulkArchive = useCallback(async () => {
     if (!onBulkArchiveSessions || selectedSessionIds.size === 0) return;
@@ -622,26 +631,14 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
 
   return (
     <>
-      <aside className="flex h-full min-h-0 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-          <div className="flex items-center justify-between px-3 pt-2">
-            <KimiCliBrand size="sm" showVersion={true} />
-            {onClose && (
-              <button
-                type="button"
-                aria-label="Close sidebar"
-                className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
-                onClick={onClose}
-              >
-                <PanelLeftClose className="size-4" />
-              </button>
-            )}
-          </div>
+      <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden">
+          <SidebarHeader onClose={onClose} />
 
           {/* Sessions */}
-          <div className="flex items-center justify-between px-3 pt-3">
+          <div className="flex min-w-0 items-center justify-between px-3 pt-3">
             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sessions</h4>
-            <div className="flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1">
               <button
                 aria-label="Refresh sessions"
                 className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
@@ -693,9 +690,9 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
 
           {/* Multi-select action bar */}
           {isMultiSelectMode && (
-            <div className="mx-2 flex items-center justify-between gap-2 rounded-md bg-secondary/80 px-2 py-1.5">
+            <div className="mx-2 flex min-w-0 items-center justify-between gap-2 overflow-hidden rounded-md bg-secondary/80 px-2 py-1.5">
               {/* Left: checkbox toggle and count */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <button
                   type="button"
                   className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
@@ -709,12 +706,12 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
                     <Square className="size-4" />
                   )}
                 </button>
-                <span className="text-xs text-muted-foreground">
+                <span className="min-w-0 truncate text-xs text-muted-foreground">
                   {selectedSessionIds.size} selected
                 </span>
               </div>
               {/* Right: action buttons */}
-              <div className="flex items-center">
+              <div className="flex shrink-0 items-center">
                 {/* Archive/Unarchive button */}
                 {isMultiSelectArchived ? (
                   onBulkUnarchiveSessions && (
@@ -799,7 +796,7 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
 
           {/* Session search and view toggle */}
           {!isMultiSelectMode && (
-          <div className="px-2 flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2 px-2">
             <div className="relative flex-1 min-w-0">
               <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -837,11 +834,11 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
           </div>
           )}
 
-          <div className="flex-1 min-h-0 flex flex-col">
-            <div className="flex-1 min-h-0">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
             {viewMode === "grouped" ? (
-              <div className="flex h-full flex-col">
-                <div className="flex-1 overflow-y-auto overflow-x-hidden [-webkit-overflow-scrolling:touch] px-3 pb-4 pr-1">
+              <div className="flex h-full min-w-0 flex-col overflow-hidden">
+                <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden [-webkit-overflow-scrolling:touch] px-3 pb-4 pr-1">
                   <ul className="space-y-1">
                     {sessionGroups.map((group) => (
                       <li key={group.workDir} className="group/dir">
@@ -1109,12 +1106,12 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
 
             {/* Archived Sessions Section */}
             {(onArchiveSession || onUnarchiveSession) && (
-              <div className="mx-2 mb-2 shrink-0 rounded-lg border border-border bg-muted/30">
-                <Collapsible open={isArchivedExpanded} onOpenChange={setIsArchivedExpanded}>
-                  <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/50 group">
+              <div className="mx-2 mb-2 min-w-0 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/30">
+                <Collapsible open={isArchivedExpanded} onOpenChange={handleArchivedOpenChange}>
+                  <CollapsibleTrigger className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/50 group">
                     <ChevronDown className="size-3 transition-transform group-data-[state=closed]:-rotate-90" />
                     <Archive className="size-3.5" />
-                    <span className="flex-1 text-left font-medium">Archived</span>
+                    <span className="min-w-0 flex-1 truncate text-left font-medium">Archived</span>
                     <span className="text-[10px] text-muted-foreground/70 bg-muted px-1.5 py-0.5 rounded">
                       {archivedSessions.length}{hasMoreArchivedSessions ? '+' : ''}
                     </span>
@@ -1127,7 +1124,7 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
                     ) : archivedSessions.length === 0 ? (
                       <p className="px-3 py-3 text-xs text-muted-foreground">No archived sessions</p>
                     ) : (
-                      <div className="space-y-1 px-1 pb-2 max-h-[50vh] overflow-y-auto">
+                      <div className="max-h-[50vh] min-w-0 space-y-1 overflow-y-auto overflow-x-hidden px-1 pb-2">
                         <ul className="space-y-1">
                           {archivedSessions.map((session) => {
                             const isActive = session.id === selectedSessionId;
@@ -1272,3 +1269,23 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
     </>
   );
 });
+
+function SidebarHeader({ onClose }: { onClose?: (() => void) | null }): ReactElement {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-2 overflow-hidden px-3 pt-2">
+      <div className="min-w-0 flex-1 overflow-hidden">
+        <KimiCliBrand size="sm" showVersion={true} />
+      </div>
+      {onClose && (
+        <button
+          type="button"
+          aria-label="Close sidebar"
+          className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+          onClick={onClose}
+        >
+          <PanelLeftClose className="size-4" />
+        </button>
+      )}
+    </div>
+  );
+}

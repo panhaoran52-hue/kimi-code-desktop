@@ -192,7 +192,7 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
   }, []);
 
   return (
-    <div className="w-full">
+    <div className="w-full min-w-0 overflow-x-hidden">
       <PromptToolbar
         gitDiffStats={gitDiffStats}
         isGitDiffLoading={isGitDiffLoading}
@@ -208,7 +208,7 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
       <PromptInput
         accept="*"
         className={cn(
-          "w-full [&_[data-slot=input-group]]:border [&_[data-slot=input-group]]:border-border",
+          "w-full min-w-0 overflow-x-hidden [&_[data-slot=input-group]]:border [&_[data-slot=input-group]]:border-border",
           planMode && "[&_[data-slot=input-group]]:border-dashed [&_[data-slot=input-group]]:!border-blue-200 dark:[&_[data-slot=input-group]]:!border-blue-600"
         )}
         multiple
@@ -216,7 +216,7 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
         onSubmit={onSubmit}
         onError={handleFileError}
       >
-        <PromptInputBody className="w-full relative">
+        <PromptInputBody className="relative w-full min-w-0 overflow-x-hidden">
           {/* Expand/Collapse button - positioned relative to entire input body */}
           <button
             type="button"
@@ -243,8 +243,8 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
               <span>Uploading files…</span>
             </Badge>
           ) : null}
-          <div className="relative w-full flex items-start">
-            <div className="flex-1 relative">
+          <div className="relative flex w-full min-w-0 items-start overflow-x-hidden">
+            <div className="relative min-w-0 flex-1">
               <PromptInputTextarea
                 ref={textareaRef}
                 className={cn(
@@ -302,8 +302,8 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
             </div>
           </div>
         </PromptInputBody>
-        <PromptInputFooter className="w-full gap-2 py-1 border-none bg-transparent shadow-none">
-          <PromptInputTools className="flex-1 min-w-0 flex-wrap">
+        <PromptInputFooter className="w-full min-w-0 flex-wrap gap-2 overflow-x-hidden border-none bg-transparent py-1 shadow-none">
+          <PromptInputTools className="min-w-0 flex-1 flex-wrap overflow-hidden">
             <GlobalConfigControls planMode={planMode} onPlanModeChange={onPlanModeChange} />
           </PromptInputTools>
           {isStreaming ? (

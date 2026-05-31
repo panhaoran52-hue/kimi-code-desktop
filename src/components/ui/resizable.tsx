@@ -27,8 +27,14 @@ function ResizablePanelGroup({
   );
 }
 
-function ResizablePanel({ ...props }: PanelProps) {
-  return <Panel data-slot="resizable-panel" {...props} />;
+function ResizablePanel({ style, ...props }: PanelProps) {
+  return (
+    <Panel
+      data-slot="resizable-panel"
+      style={{ ...style, overflow: "hidden" }}
+      {...props}
+    />
+  );
 }
 
 function ResizableHandle({
