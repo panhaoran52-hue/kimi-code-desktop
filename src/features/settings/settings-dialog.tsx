@@ -51,7 +51,12 @@ import { useTheme, type Theme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
 import { useI18n, type UiLanguage } from "@/lib/i18n";
 import { ModelCapability, type ConfigModel } from "@/lib/api/models";
-import { isTauri, openKimiLogin } from "@/lib/tauri-api";
+import {
+  checkRuntimeReadiness,
+  isTauri,
+  openKimiLogin,
+  type RuntimeReadiness,
+} from "@/lib/tauri-api";
 import {
   getConfigTomlFile,
   getMcpConfigFile,
@@ -527,7 +532,10 @@ function isBuiltInKimiProvider(
   return isKimiProvider(provider) && provider?.name === BUILT_IN_KIMI_PROVIDER_NAME;
 }
 
-function getKimiCredentialStatus(provider: ProviderEditorConfig): string {
+function getKimiCredentialStatus(
+  provider: ProviderEditorConfig,
+  runtimeReadiness: RuntimeReadiness | null,
+): string {
   if (provider.apiKey.trim()) {
     return "API key override";
   }
@@ -536,7 +544,29 @@ function getKimiCredentialStatus(provider: ProviderEditorConfig): string {
     return "config.toml env";
   }
 
+  const sources = runtimeReadiness?.config.credentialSources ?? [];
+  if (sources.some((source) => source === "Kimi credential file")) {
+    return "CLI login detected";
+  }
+  if (sources.some((source) => source.endsWith(" env"))) {
+    return "runtime env";
+  }
+  if (sources.some((source) => source.includes("api_key"))) {
+    return "config api_key";
+  }
+  if (runtimeReadiness && sources.length === 0) {
+    return "No credentials detected";
+  }
+
   return "Runtime env / CLI login";
+}
+
+function getCredentialSourceLabel(runtimeReadiness: RuntimeReadiness | null): string {
+  const sources = runtimeReadiness?.config.credentialSources ?? [];
+  if (sources.length === 0) {
+    return runtimeReadiness ? "No runtime credential source detected." : "";
+  }
+  return `Detected source: ${sources.join(", ")}`;
 }
 
 function getUniqueName(existing: string[], baseName: string): string {
@@ -682,6 +712,9 @@ export function SettingsDialog({
   const [modelKeyDraft, setModelKeyDraft] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [isOpeningKimiLogin, setIsOpeningKimiLogin] = useState(false);
+  const [runtimeReadiness, setRuntimeReadiness] =
+    useState<RuntimeReadiness | null>(null);
+  const [isCheckingRuntime, setIsCheckingRuntime] = useState(false);
   const [pendingUiLanguage, setPendingUiLanguage] =
     useState<UiLanguage>(uiLanguage);
   const [originalUiLanguage, setOriginalUiLanguage] =
@@ -752,8 +785,11 @@ export function SettingsDialog({
   const selectedProviderIsBuiltInKimi = isBuiltInKimiProvider(selectedProvider);
   const selectedProviderCredentialStatus =
     selectedProviderIsKimi && selectedProvider
-      ? getKimiCredentialStatus(selectedProvider)
+      ? getKimiCredentialStatus(selectedProvider, runtimeReadiness)
       : "";
+  const selectedProviderCredentialSource = selectedProviderIsKimi
+    ? getCredentialSourceLabel(runtimeReadiness)
+    : "";
 
   const selectedModelConfig = useMemo(
     () => modelConfigs.find((model) => model.key === selectedModelKey) ?? null,
@@ -831,6 +867,22 @@ export function SettingsDialog({
     }
   }, []);
 
+  const loadRuntimeReadiness = useCallback(async () => {
+    if (!isTauri()) {
+      setRuntimeReadiness(null);
+      return;
+    }
+    setIsCheckingRuntime(true);
+    try {
+      setRuntimeReadiness(await checkRuntimeReadiness());
+    } catch (error) {
+      console.warn("[SettingsDialog] Failed to check runtime readiness:", error);
+      setRuntimeReadiness(null);
+    } finally {
+      setIsCheckingRuntime(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!open) {
       return;
@@ -841,7 +893,8 @@ export function SettingsDialog({
     setOriginalTheme(theme);
     loadConfigFiles();
     refreshGlobalConfig();
-  }, [loadConfigFiles, open, refreshGlobalConfig]);
+    void loadRuntimeReadiness();
+  }, [loadConfigFiles, loadRuntimeReadiness, open, refreshGlobalConfig]);
 
   useEffect(() => {
     if (providerConfigs.length === 0) {
@@ -1112,6 +1165,16 @@ export function SettingsDialog({
     setOriginalTheme(theme);
   }, [theme, uiLanguage]);
 
+  const handleAppThemeChange = useCallback(
+    (value: string) => {
+      const nextTheme = value as Theme;
+      setTheme(nextTheme);
+      setPendingTheme(nextTheme);
+      setOriginalTheme(nextTheme);
+    },
+    [setTheme],
+  );
+
   const handleReloadSettings = useCallback(async () => {
     await loadConfigFiles();
     resetPendingPreferences();
@@ -1197,6 +1260,7 @@ export function SettingsDialog({
       toast.success("Kimi login terminal opened", {
         description: "Finish login in the terminal, then reload settings.",
       });
+      void loadRuntimeReadiness();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to open Kimi login";
@@ -1204,7 +1268,7 @@ export function SettingsDialog({
     } finally {
       setIsOpeningKimiLogin(false);
     }
-  }, []);
+  }, [loadRuntimeReadiness]);
 
   const handleModelChange = useCallback(
     async (modelKey: string) => {
@@ -1461,7 +1525,9 @@ export function SettingsDialog({
                             </p>
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge variant="secondary">
-                                {selectedProviderCredentialStatus}
+                                {isCheckingRuntime
+                                  ? "Checking..."
+                                  : selectedProviderCredentialStatus}
                               </Badge>
                               <Button
                                 type="button"
@@ -1480,6 +1546,11 @@ export function SettingsDialog({
                             with environment variables or an existing CLI login,
                             leave the API key empty here.
                           </p>
+                          {selectedProviderCredentialSource ? (
+                            <p className="mt-1 text-muted-foreground">
+                              {selectedProviderCredentialSource}
+                            </p>
+                          ) : null}
                         </div>
                       ) : null}
 
@@ -1932,7 +2003,7 @@ export function SettingsDialog({
                 </label>
                 <Select
                   value={pendingTheme}
-                  onValueChange={(value) => setPendingTheme(value as Theme)}
+                  onValueChange={handleAppThemeChange}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />

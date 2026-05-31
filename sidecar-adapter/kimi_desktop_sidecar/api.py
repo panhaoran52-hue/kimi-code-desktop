@@ -780,14 +780,19 @@ def handle_get_startup_dir(params: dict) -> dict:
 
 def handle_get_global_config(params: dict) -> dict:
     """Get the global config snapshot."""
+    from kimi_cli.config import load_config
     from kimi_cli.web.api.config import _build_global_config
 
-    config = _build_global_config()
-    return _ok(config.model_dump(mode="json"))
+    runtime_config = load_config()
+    config = _build_global_config().model_dump(mode="json")
+    config["default_plan_mode"] = bool(
+        getattr(runtime_config, "default_plan_mode", False)
+    )
+    return _ok(config)
 
 
 def handle_update_global_config(params: dict) -> dict:
-    """Update the global config (default_model, default_thinking).
+    """Update the global config (default_model, default_thinking, default_plan_mode).
 
     Does NOT restart workers – the Rust side manages worker lifecycle.
     """
@@ -798,6 +803,7 @@ def handle_update_global_config(params: dict) -> dict:
 
     default_model = params.get("default_model")
     default_thinking = params.get("default_thinking")
+    default_plan_mode = params.get("default_plan_mode")
 
     if default_model is not None:
         if default_model not in config.models:
@@ -807,10 +813,16 @@ def handle_update_global_config(params: dict) -> dict:
     if default_thinking is not None:
         config.default_thinking = default_thinking
 
+    if default_plan_mode is not None:
+        config.default_plan_mode = default_plan_mode
+
     save_config(config)
 
-    updated = _build_global_config()
-    return _ok(updated.model_dump(mode="json"))
+    updated = _build_global_config().model_dump(mode="json")
+    updated["default_plan_mode"] = bool(
+        getattr(config, "default_plan_mode", False)
+    )
+    return _ok(updated)
 
 
 def handle_get_git_diff_stats(params: dict) -> dict:

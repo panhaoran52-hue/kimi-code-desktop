@@ -761,6 +761,11 @@ fn has_credential_files() -> bool {
     let Ok(home) = user_home_dir() else {
         return false;
     };
+
+    if home.join(".kimi.json").is_file() {
+        return true;
+    }
+
     let credentials_dir = home.join(".kimi").join("credentials");
     let Ok(entries) = fs::read_dir(credentials_dir) else {
         return false;

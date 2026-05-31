@@ -14,6 +14,7 @@ import {
 type UpdateGlobalConfigArgs = {
   defaultModel?: string;
   defaultThinking?: boolean;
+  defaultPlanMode?: boolean;
   restartRunningSessions?: boolean;
   forceRestartBusySessions?: boolean;
 };
@@ -101,6 +102,7 @@ export function useGlobalConfig(
           resp = await tauriUpdateGlobalConfig({
             defaultModel: args.defaultModel,
             defaultThinking: args.defaultThinking,
+            defaultPlanMode: args.defaultPlanMode,
             restartRunningSessions: args.restartRunningSessions,
             forceRestartBusySessions: args.forceRestartBusySessions,
           });
@@ -108,6 +110,7 @@ export function useGlobalConfig(
           const body: UpdateGlobalConfigRequest = {
             defaultModel: args.defaultModel ?? undefined,
             defaultThinking: args.defaultThinking ?? undefined,
+            defaultPlanMode: args.defaultPlanMode ?? undefined,
             restartRunningSessions: args.restartRunningSessions ?? undefined,
             forceRestartBusySessions: args.forceRestartBusySessions ?? undefined,
           };
@@ -117,6 +120,7 @@ export function useGlobalConfig(
         }
         _cachedConfig = resp.config;
         setConfig(resp.config);
+        window.dispatchEvent(new Event("kimi:config-update"));
         return resp;
       } catch (err) {
         const message =

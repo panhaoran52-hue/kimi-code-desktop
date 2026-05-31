@@ -27,6 +27,7 @@ vi.mock("@/hooks/useGlobalConfig", () => ({
     config: {
       defaultModel: "kimi",
       defaultThinking: true,
+      defaultPlanMode: true,
       models: [
         {
           provider: "kimi",
@@ -48,6 +49,7 @@ vi.mock("@/hooks/useGlobalConfig", () => ({
 
 vi.mock("@/lib/tauri-api", () => ({
   isTauri: () => false,
+  checkRuntimeReadiness: vi.fn(),
   openKimiLogin: vi.fn(),
 }));
 
@@ -125,7 +127,7 @@ describe("SettingsDialog", () => {
     mocks.refreshGlobalConfig.mockResolvedValue(undefined);
   });
 
-  it("keeps language and app theme pending until Save settings", async () => {
+  it("applies app theme immediately while keeping language pending until Save settings", async () => {
     const user = userEvent.setup();
     renderSettingsDialog();
 
@@ -139,8 +141,8 @@ describe("SettingsDialog", () => {
 
     expect(saveSettings.hasAttribute("disabled")).toBe(false);
     expect(window.localStorage.getItem("kimi-ui-language")).toBeNull();
-    expect(window.localStorage.getItem("kimi-theme")).toBeNull();
-    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    expect(window.localStorage.getItem("kimi-theme")).toBe("dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
 
     await user.click(saveSettings);
 
@@ -151,6 +153,25 @@ describe("SettingsDialog", () => {
       expect(saveSettings.hasAttribute("disabled")).toBe(true);
     });
     expect(mocks.updateConfigTomlFile).not.toHaveBeenCalled();
+  });
+
+  it("keeps CLI session theme as a saved config.toml change", async () => {
+    const user = userEvent.setup();
+    renderSettingsDialog();
+
+    await openSection("General");
+    const previousAppTheme = window.localStorage.getItem("kimi-theme");
+    await chooseOption(2, "Dark");
+
+    expect(window.localStorage.getItem("kimi-theme")).toBe(previousAppTheme);
+
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    await waitFor(() => {
+      expect(mocks.updateConfigTomlFile).toHaveBeenCalledWith(
+        expect.stringContaining('theme = "dark"'),
+      );
+    });
   });
 
   it("surfaces MCP dirty state with a footer Save MCP action", async () => {

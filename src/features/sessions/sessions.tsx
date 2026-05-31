@@ -91,6 +91,7 @@ function shortenPath(path: string, maxLen = 30): string {
 type SessionsSidebarProps = {
   sessions: SessionSummary[];
   archivedSessions?: SessionSummary[];
+  hasLoadedArchivedSessions?: boolean;
   selectedSessionId: string;
   onSelectSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
@@ -159,6 +160,7 @@ SessionsList.displayName = "SessionsList";
 export const SessionsSidebar = memo(function SessionsSidebarComponent({
   sessions,
   archivedSessions = [],
+  hasLoadedArchivedSessions = false,
   selectedSessionId,
   onSelectSession,
   onDeleteSession,
@@ -263,16 +265,25 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
   const handleArchivedOpenChange = useCallback(
     (open: boolean) => {
       setIsArchivedExpanded(open);
-      if (!open || hasRequestedArchivedRef.current || isLoadingArchived) {
+      if (!open || isLoadingArchived) {
+        return;
+      }
+      if (hasLoadedArchivedSessions) {
+        hasRequestedArchivedRef.current = true;
+        return;
+      }
+      if (hasRequestedArchivedRef.current) {
         return;
       }
 
       hasRequestedArchivedRef.current = true;
-      Promise.resolve(onRefreshArchivedSessions?.()).catch(() => {
-        hasRequestedArchivedRef.current = false;
+      Promise.resolve(onRefreshArchivedSessions?.()).finally(() => {
+        if (!hasLoadedArchivedSessions) {
+          hasRequestedArchivedRef.current = false;
+        }
       });
     },
-    [isLoadingArchived, onRefreshArchivedSessions],
+    [hasLoadedArchivedSessions, isLoadingArchived, onRefreshArchivedSessions],
   );
 
   const handleBulkArchive = useCallback(async () => {

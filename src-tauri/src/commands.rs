@@ -376,6 +376,7 @@ pub async fn update_global_config(
     state: tauri::State<'_, WireProcessManager>,
     default_model: Option<String>,
     default_thinking: Option<bool>,
+    default_plan_mode: Option<bool>,
     restart_running_sessions: Option<bool>,
     force_restart_busy_sessions: Option<bool>,
 ) -> Result<Value, String> {
@@ -387,6 +388,7 @@ pub async fn update_global_config(
         json!({
             "default_model": default_model,
             "default_thinking": default_thinking,
+            "default_plan_mode": default_plan_mode,
         }),
     )
     .await?;
@@ -455,7 +457,12 @@ pub async fn check_runtime_readiness(
 #[tauri::command]
 pub async fn open_kimi_login() -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        let program = runtime_check::resolve_external_kimi_cli_program_blocking()?;
+        let program = runtime_check::resolve_external_kimi_cli_program_blocking().map_err(|e| {
+            format!(
+                "{}. Install the legacy Python kimi-cli runtime or set KIMI_CLI_BIN to its kimi.exe path before using in-app login.",
+                e
+            )
+        })?;
         launch_kimi_login_terminal(&program)?;
         Ok(json!({
             "success": true,
@@ -553,9 +560,9 @@ fn attach_runtime_status_to_session(
 fn launch_kimi_login_terminal(program: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        let command = format!("\"{}\" login", program);
+        let command = build_kimi_login_terminal_command(program);
         Command::new("cmd")
-            .args(["/C", "start", "Kimi Code Login", "cmd", "/K", &command])
+            .args(["/D", "/S", "/C", &command])
             .spawn()
             .map(|_| ())
             .map_err(|e| format!("Failed to open login terminal: {}", e))
@@ -602,5 +609,39 @@ fn launch_kimi_login_terminal(program: &str) -> Result<(), String> {
             "Failed to open a terminal for Kimi login ({})",
             errors.join("; ")
         ))
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn build_kimi_login_terminal_command(program: &str) -> String {
+    format!("start \"\" cmd /D /K {} login", quote_windows_cmd_arg(program))
+}
+
+#[cfg(target_os = "windows")]
+fn quote_windows_cmd_arg(value: &str) -> String {
+    format!("\"{}\"", value.replace('"', "\\\""))
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(target_os = "windows")]
+    use super::{build_kimi_login_terminal_command, quote_windows_cmd_arg};
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn quotes_kimi_login_program_for_cmd_start() {
+        assert_eq!(
+            quote_windows_cmd_arg(r#"C:\Program Files\Kimi\kimi.exe"#),
+            r#""C:\Program Files\Kimi\kimi.exe""#
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn builds_kimi_login_command_with_empty_start_title() {
+        assert_eq!(
+            build_kimi_login_terminal_command(r#"C:\Program Files\Kimi\kimi.exe"#),
+            r#"start "" cmd /D /K "C:\Program Files\Kimi\kimi.exe" login"#
+        );
     }
 }

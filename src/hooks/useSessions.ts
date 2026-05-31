@@ -41,6 +41,8 @@ type UseSessionsReturn = {
 	sessions: Session[];
 	/** List of archived sessions */
 	archivedSessions: Session[];
+	/** Whether the first archived page has been loaded at least once */
+	hasLoadedArchivedSessions: boolean;
 	/** Currently selected session ID */
 	selectedSessionId: string;
 	/** Loading state */
@@ -163,6 +165,9 @@ export function useSessions(
 
 	// Archived sessions list
 	const [archivedSessions, setArchivedSessions] = useState<Session[]>([]);
+	const [hasLoadedSessions, setHasLoadedSessions] = useState(false);
+	const [hasLoadedArchivedSessions, setHasLoadedArchivedSessions] =
+		useState(false);
 
 	// Currently selected session
 	const [selectedSessionId, setSelectedSessionId] = useState<string>("");
@@ -180,6 +185,7 @@ export function useSessions(
 	const lastRefreshRef = useRef(0);
 	const refreshInFlightRef = useRef(false);
 	const archivedRefreshInFlightRef = useRef(false);
+	const archivedPreloadRequestedRef = useRef(false);
 
 	/**
 	 * Refresh sessions list from API
@@ -211,6 +217,7 @@ export function useSessions(
 			// Update sessions list
 			setSessions(sessionsList);
 			setHasMoreSessions(sessionsList.length === PAGE_SIZE);
+			setHasLoadedSessions(true);
 			lastRefreshRef.current = Date.now();
 
 			// Don't auto-select first session - user can click on one or create a new one
@@ -297,6 +304,7 @@ export function useSessions(
 				});
 				setArchivedSessions(archivedList);
 				setHasMoreArchivedSessions(archivedList.length === PAGE_SIZE);
+				setHasLoadedArchivedSessions(true);
 				return;
 			}
 
@@ -326,13 +334,60 @@ export function useSessions(
 			);
 			setArchivedSessions(archivedList);
 			setHasMoreArchivedSessions(archivedList.length === PAGE_SIZE);
+			setHasLoadedArchivedSessions(true);
 		} catch (err) {
+			setHasLoadedArchivedSessions(false);
 			console.error("Failed to refresh archived sessions:", err);
 		} finally {
 			archivedRefreshInFlightRef.current = false;
 			setIsLoadingArchived(false);
 		}
 	}, [enabled]);
+
+	useEffect(() => {
+		if (!enabled) {
+			return;
+		}
+		if (!hasLoadedSessions || hasLoadedArchivedSessions) {
+			return;
+		}
+		if (searchQuery.trim()) {
+			return;
+		}
+		if (archivedPreloadRequestedRef.current || isLoadingArchived) {
+			return;
+		}
+
+		archivedPreloadRequestedRef.current = true;
+		const loadArchived = () => {
+			void refreshArchivedSessions();
+		};
+
+		const idleWindow = window as Window & {
+			requestIdleCallback?: (
+				callback: IdleRequestCallback,
+				options?: IdleRequestOptions,
+			) => number;
+			cancelIdleCallback?: (handle: number) => void;
+		};
+
+		if (idleWindow.requestIdleCallback) {
+			const idleId = idleWindow.requestIdleCallback(loadArchived, {
+				timeout: 1_500,
+			});
+			return () => idleWindow.cancelIdleCallback?.(idleId);
+		}
+
+		const timeoutId = window.setTimeout(loadArchived, 500);
+		return () => window.clearTimeout(timeoutId);
+	}, [
+		enabled,
+		hasLoadedArchivedSessions,
+		hasLoadedSessions,
+		isLoadingArchived,
+		refreshArchivedSessions,
+		searchQuery,
+	]);
 
 	/**
 	 * Load more archived sessions for pagination
@@ -1282,6 +1337,7 @@ export function useSessions(
 	return {
 		sessions,
 		archivedSessions,
+		hasLoadedArchivedSessions,
 		selectedSessionId,
 		isLoading,
 		isLoadingArchived,

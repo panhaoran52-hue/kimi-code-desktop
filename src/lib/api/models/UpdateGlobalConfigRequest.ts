@@ -26,11 +26,17 @@ export interface UpdateGlobalConfigRequest {
      */
     defaultModel?: string | null;
     /**
-     * 
+     *
      * @type {boolean}
      * @memberof UpdateGlobalConfigRequest
      */
     defaultThinking?: boolean | null;
+    /**
+     *
+     * @type {boolean}
+     * @memberof UpdateGlobalConfigRequest
+     */
+    defaultPlanMode?: boolean | null;
     /**
      * 
      * @type {boolean}
@@ -64,6 +70,7 @@ export function UpdateGlobalConfigRequestFromJSONTyped(json: any, ignoreDiscrimi
         
         'defaultModel': json['default_model'] == null ? undefined : json['default_model'],
         'defaultThinking': json['default_thinking'] == null ? undefined : json['default_thinking'],
+        'defaultPlanMode': json['default_plan_mode'] == null ? undefined : json['default_plan_mode'],
         'restartRunningSessions': json['restart_running_sessions'] == null ? undefined : json['restart_running_sessions'],
         'forceRestartBusySessions': json['force_restart_busy_sessions'] == null ? undefined : json['force_restart_busy_sessions'],
     };
@@ -82,8 +89,8 @@ export function UpdateGlobalConfigRequestToJSONTyped(value?: UpdateGlobalConfigR
         
         'default_model': value['defaultModel'],
         'default_thinking': value['defaultThinking'],
+        'default_plan_mode': value['defaultPlanMode'],
         'restart_running_sessions': value['restartRunningSessions'],
         'force_restart_busy_sessions': value['forceRestartBusySessions'],
     };
 }
-

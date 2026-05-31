@@ -87,7 +87,10 @@ export function ChatWorkspaceContainer({
   );
   const sessionId = selectedSessionId || null;
 
-  const { config } = useGlobalConfig({ enabled: Boolean(currentSession) });
+  const { config, update: updateGlobalConfig } = useGlobalConfig();
+  const [idlePlanModeOverride, setIdlePlanModeOverride] = useState<boolean | null>(
+    null,
+  );
   const maxContextSize = useMemo(() => {
     if (!config) return undefined;
     const model = config.models.find((m) => m.name === config.defaultModel);
@@ -138,6 +141,11 @@ export function ChatWorkspaceContainer({
     error: streamError,
   } = sessionStream;
 
+  const defaultPlanMode = config?.defaultPlanMode ?? false;
+  const displayedPlanMode = isStreamConnected
+    ? planMode
+    : (idlePlanModeOverride ?? defaultPlanMode);
+
   const pendingRequestCounts = useMemo(
     () => deriveWorkspacePendingRequestCounts(messages),
     [messages],
@@ -172,7 +180,7 @@ export function ChatWorkspaceContainer({
       contextUsage,
       tokenUsage,
       currentStep,
-      planMode,
+      planMode: displayedPlanMode,
       activity: activityStatus,
       pendingRequests: pendingRequestCounts,
       errorMessage: streamError?.message ?? null,
@@ -185,7 +193,7 @@ export function ChatWorkspaceContainer({
       contextUsage,
       tokenUsage,
       currentStep,
-      planMode,
+      displayedPlanMode,
       activityStatus,
       pendingRequestCounts,
       streamError,
@@ -381,9 +389,39 @@ export function ChatWorkspaceContainer({
     [status, isUploadingFiles, selectedSessionId, uploadFilesToSession, sendMessage, enqueue],
   );
 
-  const handlePlanModeChange = useCallback((enabled: boolean) => {
-    sendSetPlanMode(enabled);
-  }, [sendSetPlanMode]);
+  useEffect(() => {
+    if (isStreamConnected) {
+      setIdlePlanModeOverride(null);
+    }
+  }, [isStreamConnected]);
+
+  useEffect(() => {
+    setIdlePlanModeOverride(null);
+  }, [defaultPlanMode, selectedSessionId]);
+
+  const handlePlanModeChange = useCallback(
+    (enabled: boolean) => {
+      if (sendSetPlanMode(enabled)) {
+        return;
+      }
+
+      setIdlePlanModeOverride(enabled);
+      void updateGlobalConfig({
+        defaultPlanMode: enabled,
+        restartRunningSessions: false,
+      }).catch((error) => {
+        setIdlePlanModeOverride(null);
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to update default plan mode";
+        toast.error("Failed to update default plan mode", {
+          description: message,
+        });
+      });
+    },
+    [sendSetPlanMode, updateGlobalConfig],
+  );
 
   const handleForkSession = useCallback(
     async (turnIndex: number) => {
@@ -453,7 +491,7 @@ export function ChatWorkspaceContainer({
       onOpenSidebar={onOpenSidebar}
       onRenameSession={onRenameSession}
       slashCommands={slashCommands}
-      planMode={planMode}
+      planMode={displayedPlanMode}
       onPlanModeChange={handlePlanModeChange}
       errorMessage={streamError?.message}
       onForkSession={onForkSession ? handleForkSession : undefined}

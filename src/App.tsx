@@ -176,6 +176,7 @@ function App() {
 	const {
 		sessions,
 		archivedSessions,
+		hasLoadedArchivedSessions,
 		selectedSessionId,
 		createSession,
 		deleteSession,
@@ -675,6 +676,7 @@ function App() {
 										selectedSessionId={selectedSessionId}
 										sessions={sessionSummaries}
 										archivedSessions={archivedSessionSummaries}
+										hasLoadedArchivedSessions={hasLoadedArchivedSessions}
 										hasMoreSessions={hasMoreSessions}
 										hasMoreArchivedSessions={hasMoreArchivedSessions}
 										isLoadingMore={isLoadingMore}
@@ -830,6 +832,7 @@ function App() {
 								selectedSessionId={selectedSessionId}
 								sessions={sessionSummaries}
 								archivedSessions={archivedSessionSummaries}
+								hasLoadedArchivedSessions={hasLoadedArchivedSessions}
 								hasMoreSessions={hasMoreSessions}
 								hasMoreArchivedSessions={hasMoreArchivedSessions}
 								isLoadingMore={isLoadingMore}

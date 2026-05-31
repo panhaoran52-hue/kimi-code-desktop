@@ -40,6 +40,12 @@ export interface GlobalConfig {
      */
     defaultThinking: boolean;
     /**
+     * Current default plan mode
+     * @type {boolean}
+     * @memberof GlobalConfig
+     */
+    defaultPlanMode: boolean;
+    /**
      * All configured models
      * @type {Array<ConfigModel>}
      * @memberof GlobalConfig
@@ -53,6 +59,7 @@ export interface GlobalConfig {
 export function instanceOfGlobalConfig(value: object): value is GlobalConfig {
     if (!('defaultModel' in value) || value['defaultModel'] === undefined) return false;
     if (!('defaultThinking' in value) || value['defaultThinking'] === undefined) return false;
+    if (!('defaultPlanMode' in value) || value['defaultPlanMode'] === undefined) return false;
     if (!('models' in value) || value['models'] === undefined) return false;
     return true;
 }
@@ -69,6 +76,7 @@ export function GlobalConfigFromJSONTyped(json: any, ignoreDiscriminator: boolea
         
         'defaultModel': json['default_model'],
         'defaultThinking': json['default_thinking'],
+        'defaultPlanMode': Boolean(json['default_plan_mode']),
         'models': ((json['models'] as Array<any>).map(ConfigModelFromJSON)),
     };
 }
@@ -86,7 +94,7 @@ export function GlobalConfigToJSONTyped(value?: GlobalConfig | null, ignoreDiscr
         
         'default_model': value['defaultModel'],
         'default_thinking': value['defaultThinking'],
+        'default_plan_mode': value['defaultPlanMode'],
         'models': ((value['models'] as Array<any>).map(ConfigModelToJSON)),
     };
 }
-

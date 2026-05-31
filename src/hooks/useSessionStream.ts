@@ -411,7 +411,7 @@ type UseSessionStreamReturn = {
   /** Whether plan mode is active */
   planMode: boolean;
   /** Set plan mode via silent RPC (no context message) */
-  sendSetPlanMode: (enabled: boolean) => void;
+  sendSetPlanMode: (enabled: boolean) => boolean;
   /** Available slash commands from the server */
   slashCommands: SlashCommandDef[];
 };
@@ -3771,8 +3771,9 @@ export function useSessionStream(
   // Set plan mode via silent RPC (no context message)
   const sendSetPlanMode = useCallback((enabled: boolean) => {
     if (!wsRef.current || wsRef.current.readyState !== STREAM_OPEN) {
-      return;
+      return false;
     }
+    setPlanMode(enabled);
     const message: JsonRpcRequest = {
       jsonrpc: "2.0",
       method: "set_plan_mode",
@@ -3782,6 +3783,7 @@ export function useSessionStream(
     void Promise.resolve(wsRef.current.send(JSON.stringify(message))).catch((err) => {
       console.warn("[SessionStream] Failed to set plan mode:", err);
     });
+    return true;
   }, []);
 
   // Auto-connect when sessionId changes

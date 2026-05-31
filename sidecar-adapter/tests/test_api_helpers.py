@@ -5,6 +5,7 @@ import sys
 import tempfile
 import types
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -137,6 +138,63 @@ class ApiHelperTests(unittest.TestCase):
             self.assertEqual(kwargs, {"creationflags": subprocess.CREATE_NO_WINDOW})
         else:
             self.assertEqual(kwargs, {})
+
+    def test_global_config_includes_default_plan_mode(self):
+        test_case = self
+
+        class GlobalConfigDump:
+            def model_dump(self, mode):
+                test_case.assertEqual(mode, "json")
+                return {
+                    "default_model": "kimi",
+                    "default_thinking": True,
+                    "models": [],
+                }
+
+        runtime_config = types.SimpleNamespace(default_plan_mode=True)
+        with (
+            mock.patch("kimi_cli.config.load_config", return_value=runtime_config),
+            mock.patch(
+                "kimi_cli.web.api.config._build_global_config",
+                return_value=GlobalConfigDump(),
+            ),
+        ):
+            response = api.handle_get_global_config({})
+
+        self.assertTrue(response["ok"])
+        self.assertIs(response["result"]["default_plan_mode"], True)
+
+    def test_update_global_config_saves_default_plan_mode(self):
+        test_case = self
+
+        class GlobalConfigDump:
+            def model_dump(self, mode):
+                test_case.assertEqual(mode, "json")
+                return {
+                    "default_model": "kimi",
+                    "default_thinking": True,
+                    "models": [],
+                }
+
+        runtime_config = types.SimpleNamespace(
+            default_plan_mode=False,
+            default_thinking=True,
+            models={"kimi": object()},
+        )
+        with (
+            mock.patch("kimi_cli.config.load_config", return_value=runtime_config),
+            mock.patch("kimi_cli.config.save_config", create=True) as save_config,
+            mock.patch(
+                "kimi_cli.web.api.config._build_global_config",
+                return_value=GlobalConfigDump(),
+            ),
+        ):
+            response = api.handle_update_global_config({"default_plan_mode": True})
+
+        self.assertTrue(response["ok"])
+        self.assertTrue(runtime_config.default_plan_mode)
+        save_config.assert_called_once_with(runtime_config)
+        self.assertIs(response["result"]["default_plan_mode"], True)
 
 
 if __name__ == "__main__":

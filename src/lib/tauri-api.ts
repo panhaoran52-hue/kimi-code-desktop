@@ -368,6 +368,7 @@ export async function updateMcpConfig(
 export async function updateGlobalConfig(args: {
 	defaultModel?: string;
 	defaultThinking?: boolean;
+	defaultPlanMode?: boolean;
 	restartRunningSessions?: boolean;
 	forceRestartBusySessions?: boolean;
 }): Promise<UpdateGlobalConfigResponse> {
@@ -375,6 +376,7 @@ export async function updateGlobalConfig(args: {
 	const raw = await invoke<Record<string, unknown>>("update_global_config", {
 		defaultModel: args.defaultModel,
 		defaultThinking: args.defaultThinking,
+		defaultPlanMode: args.defaultPlanMode,
 		restartRunningSessions: args.restartRunningSessions,
 		forceRestartBusySessions: args.forceRestartBusySessions,
 	});
@@ -559,6 +561,7 @@ function normalizeGlobalConfig(raw: Record<string, unknown>): GlobalConfig {
 	return {
 		defaultModel: String(raw.default_model ?? raw.defaultModel ?? ""),
 		defaultThinking: Boolean(raw.default_thinking ?? raw.defaultThinking),
+		defaultPlanMode: Boolean(raw.default_plan_mode ?? raw.defaultPlanMode),
 		models: models.map((model) => ({
 			provider: String(model.provider ?? ""),
 			model: String(model.model ?? ""),
