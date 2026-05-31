@@ -60,6 +60,12 @@ jobs:
         with:
           workspaces: ./src-tauri
 
+      - name: Create Tauri sidecar placeholder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path sidecar | Out-Null
+          Set-Content -Path sidecar/kimi-sidecar-x86_64-pc-windows-msvc.exe -Value "ci-placeholder"
+
       - name: Cargo check
         run: cargo check --all-targets
 
