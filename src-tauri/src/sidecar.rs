@@ -341,17 +341,15 @@ impl WireProcessManager {
                 }
                 emit_status(app, &worker, "busy", Some("prompt"), None);
             }
-            Some("cancel") => {
-                if worker.in_flight_prompt_ids.lock().unwrap().is_empty() {
-                    if let Some(cancel_id) = id {
-                        emit_wire_message(
-                            app,
-                            &session_id,
-                            json!({"jsonrpc": "2.0", "id": cancel_id, "result": {}}).to_string(),
-                        );
-                    }
-                    return Ok(());
+            Some("cancel") if worker.in_flight_prompt_ids.lock().unwrap().is_empty() => {
+                if let Some(cancel_id) = id {
+                    emit_wire_message(
+                        app,
+                        &session_id,
+                        json!({"jsonrpc": "2.0", "id": cancel_id, "result": {}}).to_string(),
+                    );
                 }
+                return Ok(());
             }
             _ => {}
         }
