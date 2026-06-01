@@ -63,7 +63,7 @@ jobs:
 
       - name: Build MSI release
         shell: pwsh
-        run: npm run release:msi
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/release-msi.ps1
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
